@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.*
+!.env.example
+
+# Django
+*.sqlite3
+media/
+staticfiles/
+
+# Node
+node_modules/
+.next/
+out/
