@@ -17,6 +17,23 @@ class WorkPolicy(models.Model):
     fixed_break_end = models.TimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
+    def clean(self):
+        if self.break_mode == "FIXED":
+            if not self.fixed_break_start or not self.fixed_break_end:
+                raise ValidationError(
+                    "Fixed break times required."
+                )
+        
+        if self.fixed_break_start and self.fixed_break_end:
+            if self.fixed_break_end <= self.fixed_break_start:
+                raise ValidationError("The break end time must be after the start time.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        if not self.pk and WorkPolicy.objects.exists():
+            raise Exception("Only one WorkPolicy allowed.")
+        return super().save(*args, **kwargs)
+
 
 class WorkSession(models.Model):
     class Status(models.TextChoices):
@@ -61,3 +78,4 @@ class Break(models.Model):
         indexes = [
             models.Index(fields=["session"]),
         ]
+
