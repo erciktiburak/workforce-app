@@ -12,28 +12,14 @@ export default function LoginPage() {
 
   const handleLogin = async () => {
     try {
-      setLoading(true);
-
-      // Cookie login
-      await api.post("/auth/login/", {
-        username,
-        password,
-      });
-
-      // Cookie set edildi → artık me endpoint çalışmalı
+      await api.post("/auth/login/", { username, password });
+  
       const me = await api.get("/me/");
-
-      if (me.data.role === "ADMIN") {
-        router.push("/admin");
-      } else {
-        router.push("/employee");
-      }
-
+      
+      if (me.data.role === "ADMIN") router.push("/admin");
+      else router.push("/employee");
     } catch (err: any) {
-      console.error("Login Error:", err.response?.data);
-      alert("Login failed. Check credentials.");
-    } finally {
-      setLoading(false);
+      alert("Login failed! Incorrect username or password.");
     }
   };
 
