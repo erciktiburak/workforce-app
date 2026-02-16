@@ -2,9 +2,8 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -12,6 +11,12 @@ from .permissions import IsAdmin
 
 COOKIE_ACCESS = "access_token"
 COOKIE_REFRESH = "refresh_token"
+
+COOKIE_KWARGS = {
+    "httponly": True,
+    "samesite": "Lax",
+    "secure": False,
+}
 
 def _set_auth_cookies(response: Response, access: str, refresh: str):
     response.set_cookie(COOKIE_ACCESS, access, httponly=True, samesite="Lax")
@@ -29,28 +34,42 @@ class CookieTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
 class CookieTokenObtainPairView(TokenObtainPairView):
-    serializer_class = CookieTokenObtainPairSerializer
+    permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
         resp = super().post(request, *args, **kwargs)
         access = resp.data.get("access")
         refresh = resp.data.get("refresh")
+
         resp.data = {"ok": True}
-        _set_auth_cookies(resp, access, refresh)
+
+        resp.set_cookie(COOKIE_ACCESS, access, **COOKIE_KWARGS)
+        resp.set_cookie(COOKIE_REFRESH, refresh, **COOKIE_KWARGS)
         return resp
 
 class CookieTokenRefreshView(TokenRefreshView):
+    permission_classes = [AllowAny]
+    
     def post(self, request, *args, **kwargs):
         refresh = request.COOKIES.get(COOKIE_REFRESH)
         if not refresh:
             return Response({"detail": "No refresh cookie."}, status=401)
+        
         request.data["refresh"] = refresh
 
         resp = super().post(request, *args, **kwargs)
         access = resp.data.get("access")
         resp.data = {"ok": True}
-        resp.set_cookie(COOKIE_ACCESS, access, httponly=True, samesite="Lax")
+        resp.set_cookie(COOKIE_ACCESS, access, **COOKIE_KWARGS)
         return resp
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def cookie_logout(request):
+    resp = Response({"ok": True})
+    resp.delete_cookie(COOKIE_ACCESS)
+    resp.delete_cookie(COOKIE_REFRESH)
+    return resp
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
