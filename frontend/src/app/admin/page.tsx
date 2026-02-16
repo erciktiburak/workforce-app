@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function AdminDashboard() {
   const [dashboard, setDashboard] = useState<any>(null);
   const [tasks, setTasks] = useState<any[]>([]);
   const [title, setTitle] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
+  const [weekly, setWeekly] = useState<any[]>([]);
+
 
   useEffect(() => {
     api.get("/work/admin/dashboard/").then((res) => {
@@ -17,16 +20,29 @@ export default function AdminDashboard() {
     api.get("/work/tasks/all/").then((res) => {
       setTasks(res.data);
     });
+
+    api.get("/work/admin/weekly-stats/").then((res) => {
+        const formatted = res.data.map((item: any) => ({
+          date: item.date,
+          hours: (item.seconds / 3600).toFixed(2),
+        }));
+        setWeekly(formatted);
+      });
+      
   }, []);
 
   const createTask = async () => {
-    await api.post("/work/tasks/create/", {
-      title,
-      assigned_to: assignedTo,
-    });
-    alert("Task created");
-    location.reload();
-  };
+    try {
+      await api.post("/work/tasks/create/", {
+        title,
+        assigned_to: Number(assignedTo),
+      });
+      alert("Task created");
+    } catch (err: any) {
+      console.log(err.response?.data);
+      alert(JSON.stringify(err.response?.data));
+    }
+  };  
 
   if (!dashboard) return <div>Loading...</div>;
 
@@ -71,6 +87,19 @@ export default function AdminDashboard() {
             <div>Assigned To: {task.assigned_to}</div>
           </div>
         ))}
+      </div>
+
+      <div className="mt-8">
+        <h2 className="text-lg mb-4">Weekly Work Hours</h2>
+        <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={weekly}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="date" />
+            <YAxis />
+            <Tooltip />
+            <Line type="monotone" dataKey="hours" />
+            </LineChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );
