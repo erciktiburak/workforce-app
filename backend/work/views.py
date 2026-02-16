@@ -4,6 +4,71 @@ from api.permissions import IsAdmin
 from rest_framework.response import Response
 from .services import start_session, stop_session, start_break, end_break
 from .models import WorkPolicy
+from django.utils import timezone
+from datetime import timedelta
+from accounts.models import User
+from .models import WorkSession
+from .services import calculate_session_duration
+from django.db.models import Sum, F, ExpressionWrapper, DurationField
+from django.db.models.functions import TruncDate
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated, IsAdmin])
+def weekly_stats(request):
+    today = timezone.now().date()
+    start_date = today - timedelta(days=6)
+
+    sessions = (
+        WorkSession.objects
+        .filter(start_at__date__gte=start_date, status="CLOSED")
+        .annotate(
+            work_date=TruncDate("start_at"),
+            duration=ExpressionWrapper(
+                F("end_at") - F("start_at"),
+                output_field=DurationField()
+            )
+        )
+        .values("work_date")
+        .annotate(total=Sum("duration"))
+        .order_by("work_date")
+    )
+
+    result = []
+
+    for s in sessions:
+        result.append({
+            "date": s["work_date"],
+            "seconds": int(s["total"].total_seconds())
+        })
+
+    return Response(result)
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated, IsAdmin])
+def admin_dashboard(request):
+    today = timezone.now().date()
+
+    total_users = User.objects.count()
+
+    active_sessions = WorkSession.objects.filter(status="OPEN").count()
+
+    today_sessions = WorkSession.objects.filter(
+        start_at__date=today,
+        status="CLOSED"
+    )
+
+    total_today_duration = timedelta(0)
+
+    for s in today_sessions:
+        total_today_duration += calculate_session_duration(s)
+
+    return Response({
+        "total_users": total_users,
+        "active_sessions": active_sessions,
+        "today_total_work_seconds": int(total_today_duration.total_seconds()),
+        "today_total_work_hours": round(total_today_duration.total_seconds() / 3600, 2)
+    })
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
