@@ -8,24 +8,34 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const router = useRouter();
+  
 
   const handleLogin = async () => {
-    const res = await api.post("/auth/token/", {
-      username,
-      password,
-    });
+    try {
+        const res = await api.post("/auth/token/", {
+        username,
+        password,
+        });
+        
+        const access = res.data.access;
+        const refresh = res.data.refresh;
 
-    const access = res.data.access;
-    localStorage.setItem("token", access);
-    setAuthToken(access);
+        localStorage.setItem("access", access);
+        localStorage.setItem("refresh", refresh);
 
-    const me = await api.get("/me/");
+        setAuthToken(access);
 
-    if (me.data.role === "ADMIN") {
-      router.push("/admin");
-    } else {
-      router.push("/employee");
-    }
+        const me = await api.get("/me/");
+
+        if (me.data.role === "ADMIN") {
+        router.push("/admin");
+        } else {
+        router.push("/employee");
+        }
+    }   catch (err: any) {
+        console.error("Login Error:", err.response?.data);
+        alert("Unsuccessful Login!");
+    }  
   };
 
   return (
