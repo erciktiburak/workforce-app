@@ -11,7 +11,8 @@ from .models import WorkSession
 from .services import calculate_session_duration
 from django.db.models import Sum, F, ExpressionWrapper, DurationField
 from django.db.models.functions import TruncDate
-
+from .models import Task
+from .serializers import TaskSerializer
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsAdmin])
@@ -43,6 +44,50 @@ def weekly_stats(request):
         })
 
     return Response(result)
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated, IsAdmin])
+def create_task(request):
+    serializer = TaskSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save(created_by=request.user)
+        return Response(serializer.data)
+    return Response(serializer.errors, status=400)
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_tasks(request):
+    tasks = Task.objects.filter(assigned_to=request.user)
+    serializer = TaskSerializer(tasks, many=True)
+    return Response(serializer.data)
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated, IsAdmin])
+def all_tasks(request):
+    tasks = Task.objects.all()
+    serializer = TaskSerializer(tasks, many=True)
+    return Response(serializer.data)
+
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def update_task_status(request, task_id):
+    try:
+        task = Task.objects.get(id=task_id)
+    except Task.DoesNotExist:
+        return Response({"error": "Task not found"}, status=404)
+
+    if task.assigned_to != request.user and not request.user.role == "ADMIN":
+        return Response({"error": "Not allowed"}, status=403)
+
+    new_status = request.data.get("status")
+    if new_status not in Task.Status.values:
+        return Response({"error": "Invalid status"}, status=400)
+
+    task.status = new_status
+    task.save()
+
+    return Response({"status": "updated"})
+
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsAdmin])
