@@ -14,8 +14,9 @@ COOKIE_REFRESH = "refresh_token"
 
 COOKIE_KWARGS = {
     "httponly": True,
-    "samesite": "Lax",
-    "secure": False,
+    "samesite": "Lax",  
+    "secure": False,   
+    "path": "/",     
 }
 
 def _set_auth_cookies(response: Response, access: str, refresh: str):
@@ -37,15 +38,37 @@ class CookieTokenObtainPairView(TokenObtainPairView):
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
-        resp = super().post(request, *args, **kwargs)
-        access = resp.data.get("access")
-        refresh = resp.data.get("refresh")
+        print(f"Login request received: {request.data}")
+        try:
+            resp = super().post(request, *args, **kwargs)
 
-        resp.data = {"ok": True}
+            access = resp.data.get("access")
+            refresh = resp.data.get("refresh")
 
-        resp.set_cookie(COOKIE_ACCESS, access, **COOKIE_KWARGS)
-        resp.set_cookie(COOKIE_REFRESH, refresh, **COOKIE_KWARGS)
-        return resp
+            resp.data = {"ok": True}
+
+            resp.set_cookie(
+                "access_token",
+                access,
+                httponly=True,
+                samesite="Lax",
+                secure=False,
+            )
+
+            resp.set_cookie(
+                "refresh_token",
+                refresh,
+                httponly=True,
+                samesite="Lax",
+                secure=False,
+            )
+            print("Login successful, cookies set.")
+            return resp
+
+        except Exception as e:
+            print(f"Login error: {str(e)}")
+            return Response({"error": "Identity could not be verified."}, status=401)
+
 
 class CookieTokenRefreshView(TokenRefreshView):
     permission_classes = [AllowAny]
