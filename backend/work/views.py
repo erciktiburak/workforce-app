@@ -48,9 +48,12 @@ def weekly_stats(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated, IsAdmin])
 def create_task(request):
-    serializer = TaskSerializer(data=request.data)
+    data = request.data.copy()
+    data["created_by"] = request.user.id
+
+    serializer = TaskSerializer(data=data)
     if serializer.is_valid():
-        serializer.save(created_by=request.user)
+        serializer.save()
         return Response(serializer.data)
     return Response(serializer.errors, status=400)
 

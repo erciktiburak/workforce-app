@@ -27,8 +27,6 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret")
 DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost").split(",")]
 
-
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -42,13 +40,12 @@ INSTALLED_APPS = [
     'accounts',
     'api',
     'work',
+    'corsheaders',
     
 ]
 
 # Custom user model
 AUTH_USER_MODEL = 'accounts.User'
-
-
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -68,7 +65,17 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
 ]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
 
 ROOT_URLCONF = 'config.urls'
 
