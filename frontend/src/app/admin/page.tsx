@@ -54,12 +54,25 @@ export default function AdminDashboard() {
       }));
       setWeekly(formatted);
     });
-    const interval = setInterval(() => {
-      api.get("/online-users/")
-        .then((res) => setOnline(res.data))
-        .catch(() => setOnline([]));
-    }, 10000);
-    return () => clearInterval(interval);
+    api.get("/online-users/").then((res) => setOnline(res.data)).catch(() => setOnline([]));
+  }, []);
+
+  useEffect(() => {
+    const ws = new WebSocket("ws://127.0.0.1:8000/ws/presence/");
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      if (msg.status === "online") {
+        setOnline((prev) => {
+          const exists = prev.find((u) => u.id === msg.user_id);
+          if (exists) return prev;
+          return [...prev, { id: msg.user_id, username: msg.username }];
+        });
+      }
+      if (msg.status === "offline") {
+        setOnline((prev) => prev.filter((u) => u.id !== msg.user_id));
+      }
+    };
+    return () => ws.close();
   }, []);
   
   const createTask = async () => {

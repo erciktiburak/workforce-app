@@ -32,11 +32,22 @@ export default function EmployeeDashboard() {
   }, []);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      api.post("/ping/");
-    }, 30000);
-  
-    return () => clearInterval(interval);
+    const ws = new WebSocket("ws://127.0.0.1:8000/ws/presence/");
+    ws.onopen = () => {
+      const interval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "ping" }));
+        }
+      }, 30000);
+      (ws as unknown as { _interval?: ReturnType<typeof setInterval> })._interval = interval;
+    };
+    ws.onclose = () => {
+      const interval = (ws as unknown as { _interval?: ReturnType<typeof setInterval> })._interval;
+      if (interval) clearInterval(interval);
+    };
+    return () => {
+      ws.close();
+    };
   }, []);
 
   const updateStatus = async (id: number, status: string) => {
