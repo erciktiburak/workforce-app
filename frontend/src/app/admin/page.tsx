@@ -6,6 +6,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/DashboardLayout";
+import StatCard from "@/components/StatCard";
+import toast from "react-hot-toast";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -70,9 +72,10 @@ export default function AdminDashboard() {
   
       setTitle("");
       setAssignedTo("");
+      toast.success("Task created successfully");
   
     } catch (err: any) {
-      alert(JSON.stringify(err.response?.data));
+      toast.error(err.response?.data?.detail || "Failed to create task");
     }
   };
    
@@ -81,71 +84,89 @@ export default function AdminDashboard() {
 
   return (
     <DashboardLayout title="Admin Dashboard">
-      <div className="mt-6">
-        <h2 className="text-lg mb-2">Online Users</h2>
-        {online.length === 0 && <div>No active users</div>}
-        {online.map((u) => (
-          <div key={u.id} className="border p-2 mb-1">
-            {u.username}
-          </div>
-        ))}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <StatCard title="Total Users" value={dashboard.total_users} />
+        <StatCard title="Active Sessions" value={dashboard.active_sessions} />
+        <StatCard
+          title="Today Work Hours"
+          value={(dashboard.today_total_work_seconds / 3600).toFixed(2)}
+        />
       </div>
 
-      <div className="mb-6">
-        <div>Total Users: {dashboard.total_users}</div>
-        <div>Active Sessions: {dashboard.active_sessions}</div>
-        <div>
-          Today Work Hours: {(dashboard.today_total_work_seconds / 3600).toFixed(2)}
+      <div className="bg-white shadow rounded p-4 mt-6">
+        <h2 className="text-lg mb-4 font-medium">Online Users</h2>
+
+        {online.length === 0 && (
+          <div className="text-gray-500">No active users</div>
+        )}
+
+        <div className="space-y-2">
+          {online.map((u) => (
+            <div
+              key={u.id}
+              className="flex justify-between items-center border-b pb-2"
+            >
+              <span>{u.username}</span>
+              <span className="text-green-500 text-sm">● Online</span>
+            </div>
+          ))}
         </div>
       </div>
 
-      <div className="border p-4 mb-6">
-        <h2 className="text-lg mb-2">Create Task</h2>
-        <input
-          className="border p-2 mr-2"
-          placeholder="Task Title"
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <input
-          className="border p-2 mr-2"
-          placeholder="Assign User ID"
-          onChange={(e) => setAssignedTo(e.target.value)}
-        />
-        <button
-          className="bg-blue-500 text-white p-2"
-          onClick={createTask}
-        >
-          Create
-        </button>
+      <div className="bg-white shadow rounded p-4 mb-6">
+        <h2 className="text-lg mb-4 font-medium">Create Task</h2>
+        <div className="flex gap-2">
+          <input
+            className="border p-2 flex-1 rounded"
+            placeholder="Task Title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+          <input
+            className="border p-2 w-32 rounded"
+            placeholder="User ID"
+            value={assignedTo}
+            onChange={(e) => setAssignedTo(e.target.value)}
+          />
+          <button
+            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+            onClick={createTask}
+          >
+            Create
+          </button>
+        </div>
       </div>
 
-      <div>
-        <h2 className="text-lg mb-2">All Tasks</h2>
-        {tasks.map((task) => (
-          <div key={task.id} className="border p-2 mb-2">
-            <div><strong>{task.title}</strong></div>
-            <div>Status: {task.status}</div>
-            <div>Assigned To: {task.assigned_to}</div>
-          </div>
-        ))}
+      <div className="bg-white shadow rounded p-4 mb-6">
+        <h2 className="text-lg mb-4 font-medium">All Tasks</h2>
+        <div className="space-y-2">
+          {tasks.map((task) => (
+            <div key={task.id} className="border rounded p-3">
+              <div className="font-medium">{task.title}</div>
+              <div className="text-sm text-gray-500">
+                Status: {task.status} | Assigned To: {task.assigned_to}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="mb-4">
-          <Link className="underline text-blue-400" href="/admin/policy">
+        <Link className="underline text-blue-400 hover:text-blue-600" href="/admin/policy">
           Manage Work Policy
-          </Link>
+        </Link>
       </div>
 
-      <div className="mt-8">
-        <h2 className="text-lg mb-4">Weekly Work Hours</h2>
+      <div className="bg-white shadow rounded p-4 mt-8">
+        <h2 className="text-lg mb-4 font-medium">Weekly Work Hours</h2>
         <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={weekly}>
+          <LineChart data={weekly}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="date" />
             <YAxis />
             <Tooltip />
-            <Line type="monotone" dataKey="hours" />
-            </LineChart>
+            <Line type="monotone" dataKey="hours" stroke="#2563eb" strokeWidth={3} />
+          </LineChart>
         </ResponsiveContainer>
       </div>
     </DashboardLayout>
