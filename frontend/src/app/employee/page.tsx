@@ -36,9 +36,9 @@ export default function EmployeeDashboard() {
     ws.onopen = () => {
       const interval = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: "ping" }));
+          ws.send(JSON.stringify({ type: "heartbeat" }));
         }
-      }, 30000);
+      }, 20000);
       (ws as unknown as { _interval?: ReturnType<typeof setInterval> })._interval = interval;
     };
     ws.onclose = () => {

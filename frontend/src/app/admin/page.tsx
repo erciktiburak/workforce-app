@@ -54,10 +54,11 @@ export default function AdminDashboard() {
       }));
       setWeekly(formatted);
     });
-    api.get("/online-users/").then((res) => setOnline(res.data)).catch(() => setOnline([]));
   }, []);
 
   useEffect(() => {
+    api.get("/online-users/").then((res) => setOnline(res.data)).catch(() => setOnline([]));
+
     const ws = new WebSocket("ws://127.0.0.1:8000/ws/presence/");
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);
@@ -68,11 +69,16 @@ export default function AdminDashboard() {
           return [...prev, { id: msg.user_id, username: msg.username }];
         });
       }
-      if (msg.status === "offline") {
-        setOnline((prev) => prev.filter((u) => u.id !== msg.user_id));
-      }
     };
-    return () => ws.close();
+
+    const snapshotInterval = setInterval(() => {
+      api.get("/online-users/").then((res) => setOnline(res.data)).catch(() => {});
+    }, 30000);
+
+    return () => {
+      ws.close();
+      clearInterval(snapshotInterval);
+    };
   }, []);
   
   const createTask = async () => {
