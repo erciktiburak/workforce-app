@@ -67,11 +67,13 @@ def create_task(request):
             )
     data = request.data.copy()
     data["created_by"] = request.user.id
-    data["organization"] = org.id
 
     serializer = TaskSerializer(data=data)
     if serializer.is_valid():
-        serializer.save()
+        serializer.save(
+            created_by=request.user,
+            organization=org,
+        )
         return Response(serializer.data)
     return Response(serializer.errors, status=400)
 
