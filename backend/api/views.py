@@ -89,8 +89,13 @@ class CookieTokenRefreshView(TokenRefreshView):
 @permission_classes([IsAuthenticated, IsAdmin])
 def online_users(request):
     threshold = timezone.now() - timedelta(seconds=60)
-
-    users = User.objects.filter(last_seen_at__gte=threshold)
+    org = request.user.organization
+    if not org:
+        return Response([])
+    users = User.objects.filter(
+        organization=org,
+        last_seen_at__gte=threshold,
+    )
 
     return Response([
         {
@@ -135,6 +140,7 @@ def me_view(request):
         "email": u.email,
         "role": role,
         "last_seen_at": u.last_seen_at,
+        "organization": u.organization.name if u.organization else None,
     })
 
 @api_view(["POST"])
@@ -147,6 +153,10 @@ def ping_view(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsAdmin])
 def admin_users_view(request):
-    from accounts.models import User
-    users = User.objects.order_by("-last_seen_at").values("id", "username", "email", "role", "is_active", "last_seen_at")
+    org = request.user.organization
+    if not org:
+        return Response([])
+    users = User.objects.filter(organization=org).order_by("-last_seen_at").values(
+        "id", "username", "email", "role", "is_active", "last_seen_at"
+    )
     return Response(list(users))

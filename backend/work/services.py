@@ -37,6 +37,18 @@ def get_today_work_duration(user):
 
     return total
 
+def _get_policy_for_user(user):
+    policy, _ = WorkPolicy.objects.get_or_create(
+        organization=user.organization,
+        defaults={
+            "daily_work_minutes": 480,
+            "daily_break_minutes": 60,
+            "break_mode": WorkPolicy.BreakMode.FLEXIBLE,
+        },
+    )
+    return policy
+
+
 def start_session(user):
     if WorkSession.objects.filter(user=user, status="OPEN").exists():
         raise Exception("Active session already exists.")
@@ -44,6 +56,7 @@ def start_session(user):
     return WorkSession.objects.create(
         user=user,
         start_at=timezone.now(),
+        organization=user.organization,
     )
 @transaction.atomic
 def stop_session(user):
@@ -54,7 +67,7 @@ def stop_session(user):
     if session.breaks.filter(end_at__isnull=True).exists():
         raise Exception("Cannot stop while break is active.")
 
-    policy = WorkPolicy.objects.first() or WorkPolicy.objects.create()
+    policy = _get_policy_for_user(user)
     allowed_work = timedelta(minutes=policy.daily_work_minutes)
 
     proposed_end = timezone.now()
@@ -100,7 +113,7 @@ def end_break(user):
     br.end_at = timezone.now()
     br.save()
 
-    policy = WorkPolicy.objects.first() or WorkPolicy.objects.create()
+    policy = _get_policy_for_user(user)
     allowed_break = timedelta(minutes=policy.daily_break_minutes)
     
     today = timezone.now().date()

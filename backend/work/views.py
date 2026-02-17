@@ -17,12 +17,15 @@ from .serializers import TaskSerializer
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsAdmin])
 def weekly_stats(request):
+    org = request.user.organization
+    if not org:
+        return Response([])
     today = timezone.now().date()
     start_date = today - timedelta(days=6)
 
     sessions = (
         WorkSession.objects
-        .filter(start_at__date__gte=start_date, status="CLOSED")
+        .filter(organization=org, start_at__date__gte=start_date, status="CLOSED")
         .annotate(
             work_date=TruncDate("start_at"),
             duration=ExpressionWrapper(
@@ -48,8 +51,23 @@ def weekly_stats(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated, IsAdmin])
 def create_task(request):
+    org = request.user.organization
+    if not org:
+        return Response({"error": "User has no organization"}, status=400)
+    assigned_to_id = request.data.get("assigned_to")
+    if assigned_to_id is not None:
+        try:
+            assigned_user = User.objects.get(id=assigned_to_id)
+        except User.DoesNotExist:
+            return Response({"error": "Assigned user not found"}, status=400)
+        if assigned_user.organization_id != org.id:
+            return Response(
+                {"error": "Cannot assign task to user from another organization"},
+                status=400,
+            )
     data = request.data.copy()
     data["created_by"] = request.user.id
+    data["organization"] = org.id
 
     serializer = TaskSerializer(data=data)
     if serializer.is_valid():
@@ -60,14 +78,20 @@ def create_task(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def my_tasks(request):
-    tasks = Task.objects.filter(assigned_to=request.user)
+    org = request.user.organization
+    if not org:
+        return Response([])
+    tasks = Task.objects.filter(organization=org, assigned_to=request.user)
     serializer = TaskSerializer(tasks, many=True)
     return Response(serializer.data)
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsAdmin])
 def all_tasks(request):
-    tasks = Task.objects.all()
+    org = request.user.organization
+    if not org:
+        return Response([])
+    tasks = Task.objects.filter(organization=org)
     serializer = TaskSerializer(tasks, many=True)
     return Response(serializer.data)
 
@@ -78,8 +102,9 @@ def update_task_status(request, task_id):
         task = Task.objects.get(id=task_id)
     except Task.DoesNotExist:
         return Response({"error": "Task not found"}, status=404)
-
-    if task.assigned_to != request.user and not request.user.role == "ADMIN":
+    if task.organization_id != request.user.organization_id:
+        return Response({"error": "Task not in your organization"}, status=403)
+    if task.assigned_to != request.user and request.user.role != "ADMIN":
         return Response({"error": "Not allowed"}, status=403)
 
     new_status = request.data.get("status")
@@ -95,15 +120,22 @@ def update_task_status(request, task_id):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsAdmin])
 def admin_dashboard(request):
+    org = request.user.organization
+    if not org:
+        return Response({
+            "total_users": 0,
+            "active_sessions": 0,
+            "today_total_work_seconds": 0,
+            "today_total_work_hours": 0,
+        })
     today = timezone.now().date()
 
-    total_users = User.objects.count()
-
-    active_sessions = WorkSession.objects.filter(status="OPEN").count()
-
+    total_users = User.objects.filter(organization=org).count()
+    active_sessions = WorkSession.objects.filter(organization=org, status="OPEN").count()
     today_sessions = WorkSession.objects.filter(
+        organization=org,
         start_at__date=today,
-        status="CLOSED"
+        status="CLOSED",
     )
 
     total_today_duration = timedelta(0)
@@ -157,9 +189,17 @@ def break_end(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def policy_view(request):
-    policy = WorkPolicy.objects.first()
-    if not policy:
-        policy = WorkPolicy.objects.create()
+    org = request.user.organization
+    if not org:
+        return Response({"error": "User has no organization"}, status=400)
+    policy, _ = WorkPolicy.objects.get_or_create(
+        organization=org,
+        defaults={
+            "daily_work_minutes": 480,
+            "daily_break_minutes": 60,
+            "break_mode": WorkPolicy.BreakMode.FLEXIBLE,
+        },
+    )
     return Response({
         "daily_work_minutes": policy.daily_work_minutes,
         "daily_break_minutes": policy.daily_break_minutes,
@@ -171,9 +211,17 @@ def policy_view(request):
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated, IsAdmin])
 def update_policy(request):
-    policy = WorkPolicy.objects.first()
-    if not policy:
-        policy = WorkPolicy.objects.create()
+    org = request.user.organization
+    if not org:
+        return Response({"error": "User has no organization"}, status=400)
+    policy, _ = WorkPolicy.objects.get_or_create(
+        organization=org,
+        defaults={
+            "daily_work_minutes": 480,
+            "daily_break_minutes": 60,
+            "break_mode": WorkPolicy.BreakMode.FLEXIBLE,
+        },
+    )
 
     data = request.data
 

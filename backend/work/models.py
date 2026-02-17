@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.core.exceptions import ValidationError
 
 
 class WorkPolicy(models.Model):
@@ -7,6 +8,13 @@ class WorkPolicy(models.Model):
         FLEXIBLE = "FLEXIBLE", "Flexible"
         FIXED = "FIXED", "Fixed"
 
+    organization = models.OneToOneField(
+        "accounts.Organization",
+        on_delete=models.CASCADE,
+        related_name="policy",
+        null=True,
+        blank=True,
+    )
     daily_work_minutes = models.PositiveIntegerField(default=480)  # 8 saat
     daily_break_minutes = models.PositiveIntegerField(default=60)
     break_mode = models.CharField(
@@ -18,21 +26,17 @@ class WorkPolicy(models.Model):
     fixed_break_end = models.TimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
+
     def clean(self):
         if self.break_mode == "FIXED":
             if not self.fixed_break_start or not self.fixed_break_end:
-                raise ValidationError(
-                    "Fixed break times required."
-                )
-        
+                raise ValidationError("Fixed break times required.")
         if self.fixed_break_start and self.fixed_break_end:
             if self.fixed_break_end <= self.fixed_break_start:
                 raise ValidationError("The break end time must be after the start time.")
 
     def save(self, *args, **kwargs):
         self.full_clean()
-        if not self.pk and WorkPolicy.objects.exists():
-            raise Exception("Only one WorkPolicy allowed.")
         return super().save(*args, **kwargs)
 
 
@@ -41,6 +45,13 @@ class WorkSession(models.Model):
         OPEN = "OPEN", "Open"
         CLOSED = "CLOSED", "Closed"
 
+    organization = models.ForeignKey(
+        "accounts.Organization",
+        on_delete=models.CASCADE,
+        related_name="work_sessions",
+        null=True,
+        blank=True,
+    )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -86,6 +97,13 @@ class Task(models.Model):
         DOING = "DOING", "Doing"
         DONE = "DONE", "Done"
 
+    organization = models.ForeignKey(
+        "accounts.Organization",
+        on_delete=models.CASCADE,
+        related_name="tasks",
+        null=True,
+        blank=True,
+    )
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
 
