@@ -105,6 +105,7 @@ def logout_view(request):
 @permission_classes([IsAuthenticated])
 def me_view(request):
     u = request.user
+    role = "ADMIN" if u.is_staff or u.is_superuser else "EMPLOYEE"
     return Response({
         "id": u.id,
         "username": u.username,
