@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function DashboardLayout({
   children,
@@ -14,6 +14,11 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const [dark, setDark] = useState(false);
+  const [me, setMe] = useState<{ organization?: string } | null>(null);
+
+  useEffect(() => {
+    api.get("/me/").then((res) => setMe(res.data)).catch(() => {});
+  }, []);
 
   const logout = async () => {
     try {
@@ -61,9 +66,14 @@ export default function DashboardLayout({
 
         {/* Content */}
         <main className="flex-1 p-8 overflow-auto">
-          <h1 className="text-2xl font-semibold mb-6 text-gray-800 dark:text-white">
+          <h1 className="text-2xl font-semibold mb-2 text-gray-800 dark:text-white">
             {title}
           </h1>
+          {me?.organization && (
+            <div className="text-sm text-gray-500 dark:text-gray-300 mb-4">
+              Organization: {me.organization}
+            </div>
+          )}
 
           {children}
         </main>
