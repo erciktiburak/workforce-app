@@ -14,12 +14,16 @@ export default function LoginPage() {
     try {
       await api.post("/auth/login/", { username, password });
   
-      const me = await api.get("/me/");
+      const meRes = await api.get("/me/");
+      const { role } = meRes.data;
       
-      if (me.data.role === "ADMIN") router.push("/admin");
-      else router.push("/employee");
-    } catch (err: any) {
-      alert("Login failed! Incorrect username or password.");
+      if (role === "ADMIN") {
+        router.push("/admin");
+      } else {
+        router.push("/employee");
+      }
+    } catch (err) {
+      alert("Unable to log in!");
     }
   };
 
