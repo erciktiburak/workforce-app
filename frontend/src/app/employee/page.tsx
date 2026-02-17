@@ -5,11 +5,26 @@ import api from "@/lib/api";
 
 export default function EmployeeDashboard() {
   const [tasks, setTasks] = useState<any[]>([]);
-
+  const logout = async () => {
+    try {
+      await api.post("/auth/logout/");
+      window.location.href = "/login";
+    } catch {
+      window.location.href = "/login";
+    }
+  };
   useEffect(() => {
     api.get("/work/tasks/my/").then((res) => {
       setTasks(res.data);
     });
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      api.post("/ping/");
+    }, 30000);
+  
+    return () => clearInterval(interval);
   }, []);
 
   const updateStatus = async (id: number, status: string) => {
@@ -67,6 +82,16 @@ export default function EmployeeDashboard() {
             )}
           </div>
         ))}
+      </div>
+
+
+      <div className="mt-8">
+        <button
+          onClick={logout}
+          className="bg-gray-700 text-white px-4 py-2 rounded"
+        >
+          Logout
+        </button>
       </div>
     </div>
   );

@@ -1,13 +1,12 @@
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
+from datetime import timedelta
+from api.permissions import IsAdmin
+from accounts.models import User
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-
-from .permissions import IsAdmin
 
 COOKIE_ACCESS = "access_token"
 COOKIE_REFRESH = "refresh_token"
@@ -86,6 +85,30 @@ class CookieTokenRefreshView(TokenRefreshView):
         resp.set_cookie(COOKIE_ACCESS, access, **COOKIE_KWARGS)
         return resp
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated, IsAdmin])
+def online_users(request):
+    threshold = timezone.now() - timedelta(seconds=60)
+
+    users = User.objects.filter(last_seen_at__gte=threshold)
+
+    return Response([
+        {
+            "id": u.id,
+            "username": u.username,
+            "last_seen_at": u.last_seen_at,
+        }
+        for u in users
+    ])
+    
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def ping(request):
+    user = request.user
+    user.last_seen_at = timezone.now()
+    user.save(update_fields=["last_seen_at"])
+    return Response({"ok": True})
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def cookie_logout(request):
@@ -105,12 +128,12 @@ def logout_view(request):
 @permission_classes([IsAuthenticated])
 def me_view(request):
     u = request.user
-    role = "ADMIN" if u.is_staff or u.is_superuser else "EMPLOYEE"
+    role = getattr(u, "role", "EMPLOYEE") or "EMPLOYEE"
     return Response({
         "id": u.id,
         "username": u.username,
         "email": u.email,
-        "role": u.role,
+        "role": role,
         "last_seen_at": u.last_seen_at,
     })
 

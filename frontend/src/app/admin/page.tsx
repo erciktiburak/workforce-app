@@ -11,48 +11,73 @@ export default function AdminDashboard() {
   const [title, setTitle] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
   const [weekly, setWeekly] = useState<any[]>([]);
+  const [online, setOnline] = useState<any[]>([]);
 
+  const logout = async () => {
+    await api.post("/auth/logout/");
+    window.location.href = "/login";
+  };
   useEffect(() => {
     api.get("/work/admin/dashboard/").then((res) => {
       setDashboard(res.data);
     });
-
+  
     api.get("/work/tasks/all/").then((res) => {
       setTasks(res.data);
     });
-
+  
     api.get("/work/admin/weekly-stats/").then((res) => {
-        const formatted = res.data.map((item: any) => ({
-          date: item.date,
-          hours: (item.seconds / 3600).toFixed(2),
-        }));
-        setWeekly(formatted);
-      });
-      
+      const formatted = res.data.map((item: any) => ({
+        date: item.date,
+        hours: (item.seconds / 3600).toFixed(2),
+      }));
+      setWeekly(formatted);
+    });
+  
+    const interval = setInterval(() => {
+      api.get("/online-users/")
+        .then((res) => setOnline(res.data))
+        .catch(() => setOnline([])); // 403 when not admin — hide online list
+    }, 10000);
+  
+    return () => clearInterval(interval);
+  
   }, []);
-
+  
   const createTask = async () => {
     try {
       await api.post("/work/tasks/create/", {
         title,
         assigned_to: Number(assignedTo),
       });
-      alert("Task created");
+  
+      const res = await api.get("/work/tasks/all/");
+      setTasks(res.data);
+  
+      setTitle("");
+      setAssignedTo("");
+  
     } catch (err: any) {
-      console.log(err.response?.data);
       alert(JSON.stringify(err.response?.data));
     }
-  };  
-
-<Link className="underline" href="/admin/policy">
-  Manage Work Policy
-</Link>
+  };
+   
 
   if (!dashboard) return <div>Loading...</div>;
 
   return (
     <div className="p-6">
       <h1 className="text-2xl mb-4">Admin Dashboard</h1>
+
+      <div className="mt-6">
+        <h2 className="text-lg mb-2">Online Users</h2>
+        {online.length === 0 && <div>No active users</div>}
+        {online.map((u) => (
+          <div key={u.id} className="border p-2 mb-1">
+            {u.username}
+          </div>
+        ))}
+      </div>
 
       <div className="mb-6">
         <div>Total Users: {dashboard.total_users}</div>
@@ -91,6 +116,21 @@ export default function AdminDashboard() {
             <div>Assigned To: {task.assigned_to}</div>
           </div>
         ))}
+      </div>
+
+      <div className="mb-4">
+          <Link className="underline text-blue-400" href="/admin/policy">
+          Manage Work Policy
+          </Link>
+      </div>
+
+      <div className="mt-8">
+        <button
+          onClick={logout}
+          className="bg-gray-700 text-white px-4 py-2 rounded"
+        >
+          Logout
+        </button>
       </div>
 
       <div className="mt-8">
