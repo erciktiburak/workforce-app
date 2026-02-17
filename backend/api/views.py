@@ -86,23 +86,20 @@ class CookieTokenRefreshView(TokenRefreshView):
         return resp
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated, IsAdmin])
+@permission_classes([IsAuthenticated])
 def online_users(request):
-    threshold = timezone.now() - timedelta(seconds=60)
+    if request.user.role != "ADMIN":
+        return Response({"error": "Unauthorized"}, status=403)
     org = request.user.organization
     if not org:
         return Response([])
+    threshold = timezone.now() - timedelta(seconds=60)
     users = User.objects.filter(
         organization=org,
         last_seen_at__gte=threshold,
     )
-
     return Response([
-        {
-            "id": u.id,
-            "username": u.username,
-            "last_seen_at": u.last_seen_at,
-        }
+        {"id": u.id, "username": u.username}
         for u in users
     ])
     

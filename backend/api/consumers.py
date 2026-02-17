@@ -32,17 +32,6 @@ class PresenceConsumer(AsyncWebsocketConsumer):
         )
 
     async def disconnect(self, close_code):
-        user = self.scope.get("user")
-        if user and not user.is_anonymous:
-            await self.channel_layer.group_send(
-                self.group_name,
-                {
-                    "type": "presence_event",
-                    "user_id": user.id,
-                    "username": user.username,
-                    "status": "offline",
-                },
-            )
         if hasattr(self, "group_name"):
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
 
