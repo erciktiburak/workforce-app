@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Class-based dark mode for dashboard toggle */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

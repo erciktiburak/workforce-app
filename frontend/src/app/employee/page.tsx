@@ -86,17 +86,17 @@ export default function EmployeeDashboard() {
         </button>
       </div>
 
-      <div className="bg-white shadow rounded p-4">
-        <h2 className="text-lg mb-4 font-medium">My Tasks</h2>
+      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 transition-colors">
+        <h2 className="text-lg mb-4 font-medium text-gray-800 dark:text-white">My Tasks</h2>
 
         {tasks.length === 0 && (
-          <div className="text-gray-500">No tasks assigned</div>
+          <div className="text-gray-500 dark:text-gray-400">No tasks assigned</div>
         )}
 
         {tasks.map((task) => (
-          <div key={task.id} className="border rounded p-3 mb-3">
-            <div className="font-medium">{task.title}</div>
-            <div className="text-sm text-gray-500 mb-2">
+          <div key={task.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-3 mb-3">
+            <div className="font-medium text-gray-800 dark:text-white">{task.title}</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
               Status: {task.status}
             </div>
 

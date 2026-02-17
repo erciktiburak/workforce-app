@@ -84,7 +84,7 @@ export default function AdminDashboard() {
 
   return (
     <DashboardLayout title="Admin Dashboard">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <StatCard title="Total Users" value={dashboard.total_users} />
         <StatCard title="Active Sessions" value={dashboard.active_sessions} />
         <StatCard
@@ -93,43 +93,43 @@ export default function AdminDashboard() {
         />
       </div>
 
-      <div className="bg-white shadow rounded p-4 mt-6">
-        <h2 className="text-lg mb-4 font-medium">Online Users</h2>
+      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 mt-6 transition-colors">
+        <h2 className="text-lg mb-4 font-medium text-gray-800 dark:text-white">Online Users</h2>
 
         {online.length === 0 && (
-          <div className="text-gray-500">No active users</div>
+          <div className="text-gray-500 dark:text-gray-400">No active users</div>
         )}
 
         <div className="space-y-2">
           {online.map((u) => (
             <div
               key={u.id}
-              className="flex justify-between items-center border-b pb-2"
+              className="flex justify-between items-center border-b border-gray-200 dark:border-gray-600 pb-2"
             >
-              <span>{u.username}</span>
+              <span className="text-gray-800 dark:text-gray-200">{u.username}</span>
               <span className="text-green-500 text-sm">● Online</span>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="bg-white shadow rounded p-4 mb-6">
-        <h2 className="text-lg mb-4 font-medium">Create Task</h2>
+      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 mb-6 transition-colors">
+        <h2 className="text-lg mb-4 font-medium text-gray-800 dark:text-white">Create Task</h2>
         <div className="flex gap-2">
           <input
-            className="border p-2 flex-1 rounded"
+            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 p-2 flex-1 rounded"
             placeholder="Task Title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
           <input
-            className="border p-2 w-32 rounded"
+            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 p-2 w-32 rounded"
             placeholder="User ID"
             value={assignedTo}
             onChange={(e) => setAssignedTo(e.target.value)}
           />
           <button
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
             onClick={createTask}
           >
             Create
@@ -137,13 +137,13 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="bg-white shadow rounded p-4 mb-6">
-        <h2 className="text-lg mb-4 font-medium">All Tasks</h2>
+      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 mb-6 transition-colors">
+        <h2 className="text-lg mb-4 font-medium text-gray-800 dark:text-white">All Tasks</h2>
         <div className="space-y-2">
           {tasks.map((task) => (
-            <div key={task.id} className="border rounded p-3">
-              <div className="font-medium">{task.title}</div>
-              <div className="text-sm text-gray-500">
+            <div key={task.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-3">
+              <div className="font-medium text-gray-800 dark:text-white">{task.title}</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">
                 Status: {task.status} | Assigned To: {task.assigned_to}
               </div>
             </div>
@@ -152,13 +152,13 @@ export default function AdminDashboard() {
       </div>
 
       <div className="mb-4">
-        <Link className="underline text-blue-400 hover:text-blue-600" href="/admin/policy">
+        <Link className="underline text-blue-400 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300" href="/admin/policy">
           Manage Work Policy
         </Link>
       </div>
 
-      <div className="bg-white shadow rounded p-4 mt-8">
-        <h2 className="text-lg mb-4 font-medium">Weekly Work Hours</h2>
+      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 mt-8 transition-colors">
+        <h2 className="text-lg mb-4 font-medium text-gray-800 dark:text-white">Weekly Work Hours</h2>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={weekly}>
             <CartesianGrid strokeDasharray="3 3" />
