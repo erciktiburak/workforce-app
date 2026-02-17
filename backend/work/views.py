@@ -157,7 +157,9 @@ def break_end(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def policy_view(request):
-    policy = WorkPolicy.objects.first() or WorkPolicy.objects.create()
+    policy = WorkPolicy.objects.first()
+    if not policy:
+        policy = WorkPolicy.objects.create()
     return Response({
         "daily_work_minutes": policy.daily_work_minutes,
         "daily_break_minutes": policy.daily_break_minutes,
@@ -173,16 +175,21 @@ def update_policy(request):
     if not policy:
         policy = WorkPolicy.objects.create()
 
-    policy.daily_work_minutes = request.data.get("daily_work_minutes", policy.daily_work_minutes)
-    policy.daily_break_minutes = request.data.get("daily_break_minutes", policy.daily_break_minutes)
-    policy.break_mode = request.data.get("break_mode", policy.break_mode)
-    policy.fixed_break_start = request.data.get("fixed_break_start", policy.fixed_break_start)
-    policy.fixed_break_end = request.data.get("fixed_break_end", policy.fixed_break_end)
+    data = request.data
 
-    try:
-        policy.save()
-        return Response({"status": "policy_updated", "data": request.data})
-    except ValidationError as e:
-        return Response({"error": e.message_dict if hasattr(e, 'message_dict') else str(e)}, status=400)
-    except Exception as e:
-        return Response({"error": str(e)}, status=400)
+    if "daily_work_minutes" in data:
+        policy.daily_work_minutes = int(data["daily_work_minutes"])
+    if "daily_break_minutes" in data:
+        policy.daily_break_minutes = int(data["daily_break_minutes"])
+    if "break_mode" in data:
+        policy.break_mode = data["break_mode"]
+
+    if "fixed_break_start" in data:
+        policy.fixed_break_start = data["fixed_break_start"] or None
+    if "fixed_break_end" in data:
+        policy.fixed_break_end = data["fixed_break_end"] or None
+
+    policy.full_clean()
+    policy.save()
+
+    return Response({"ok": True})
