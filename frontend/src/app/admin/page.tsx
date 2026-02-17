@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import DashboardLayout from "@/components/DashboardLayout";
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const [dashboard, setDashboard] = useState<any>(null);
   const [tasks, setTasks] = useState<any[]>([]);
   const [title, setTitle] = useState("");
@@ -13,10 +16,21 @@ export default function AdminDashboard() {
   const [weekly, setWeekly] = useState<any[]>([]);
   const [online, setOnline] = useState<any[]>([]);
 
-  const logout = async () => {
-    await api.post("/auth/logout/");
-    window.location.href = "/login";
-  };
+  useEffect(() => {
+    const checkRole = async () => {
+      try {
+        const me = await api.get("/me/");
+        if (me.data.role !== "ADMIN") {
+          router.push("/employee");
+        }
+      } catch {
+        router.push("/login");
+      }
+    };
+
+    checkRole();
+  }, [router]);
+
   useEffect(() => {
     api.get("/work/admin/dashboard/").then((res) => {
       setDashboard(res.data);
@@ -63,12 +77,10 @@ export default function AdminDashboard() {
   };
    
 
-  if (!dashboard) return <div>Loading...</div>;
+  if (!dashboard) return <DashboardLayout title="Admin Dashboard"><div>Loading...</div></DashboardLayout>;
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl mb-4">Admin Dashboard</h1>
-
+    <DashboardLayout title="Admin Dashboard">
       <div className="mt-6">
         <h2 className="text-lg mb-2">Online Users</h2>
         {online.length === 0 && <div>No active users</div>}
@@ -125,15 +137,6 @@ export default function AdminDashboard() {
       </div>
 
       <div className="mt-8">
-        <button
-          onClick={logout}
-          className="bg-gray-700 text-white px-4 py-2 rounded"
-        >
-          Logout
-        </button>
-      </div>
-
-      <div className="mt-8">
         <h2 className="text-lg mb-4">Weekly Work Hours</h2>
         <ResponsiveContainer width="100%" height={300}>
             <LineChart data={weekly}>
@@ -145,6 +148,6 @@ export default function AdminDashboard() {
             </LineChart>
         </ResponsiveContainer>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }

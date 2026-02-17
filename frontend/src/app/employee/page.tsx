@@ -2,17 +2,28 @@
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
+import { useRouter } from "next/navigation";
+import DashboardLayout from "@/components/DashboardLayout";
 
 export default function EmployeeDashboard() {
+  const router = useRouter();
   const [tasks, setTasks] = useState<any[]>([]);
-  const logout = async () => {
-    try {
-      await api.post("/auth/logout/");
-      window.location.href = "/login";
-    } catch {
-      window.location.href = "/login";
-    }
-  };
+
+  useEffect(() => {
+    const checkRole = async () => {
+      try {
+        const me = await api.get("/me/");
+        if (me.data.role !== "EMPLOYEE") {
+          router.push("/admin");
+        }
+      } catch {
+        router.push("/login");
+      }
+    };
+
+    checkRole();
+  }, [router]);
+
   useEffect(() => {
     api.get("/work/tasks/my/").then((res) => {
       setTasks(res.data);
@@ -45,9 +56,7 @@ export default function EmployeeDashboard() {
   };
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl mb-4">Employee Panel</h1>
-
+    <DashboardLayout title="Employee Panel">
       <div className="mb-6">
         <button className="bg-green-500 text-white p-2 mr-2" onClick={startWork}>
           Start Work
@@ -83,16 +92,6 @@ export default function EmployeeDashboard() {
           </div>
         ))}
       </div>
-
-
-      <div className="mt-8">
-        <button
-          onClick={logout}
-          className="bg-gray-700 text-white px-4 py-2 rounded"
-        >
-          Logout
-        </button>
-      </div>
-    </div>
+    </DashboardLayout>
   );
 }
