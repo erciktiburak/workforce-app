@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import Link from "next/link";
 
 export default function AdminDashboard() {
   const [dashboard, setDashboard] = useState<any>(null);
@@ -10,7 +11,6 @@ export default function AdminDashboard() {
   const [title, setTitle] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
   const [weekly, setWeekly] = useState<any[]>([]);
-
 
   useEffect(() => {
     api.get("/work/admin/dashboard/").then((res) => {
@@ -43,6 +43,10 @@ export default function AdminDashboard() {
       alert(JSON.stringify(err.response?.data));
     }
   };  
+
+<Link className="underline" href="/admin/policy">
+  Manage Work Policy
+</Link>
 
   if (!dashboard) return <div>Loading...</div>;
 
