@@ -999,7 +999,7 @@ def my_monthly_pdf(request):
     doc.build(elements)
     buffer.seek(0)
 
-    response = HttpResponse(buffer, content_type="application/pdf")
+    response = HttpResponse(buffer.read(), content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="monthly_report_{month:02d}_{year}.pdf"'
 
     return response
