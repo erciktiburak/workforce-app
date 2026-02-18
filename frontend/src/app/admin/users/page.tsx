@@ -49,7 +49,7 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <DashboardLayout title="Users">
+    <DashboardLayout title="Users" role="ADMIN">
       <Link
         href="/admin"
         className="inline-block mb-6 bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition"
@@ -91,13 +91,12 @@ export default function AdminUsersPage() {
                   )}
                 </div>
               </div>
-              <button
-                type="button"
-                className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                onClick={() => {}}
+              <Link
+                href={`/admin/users/${u.id}`}
+                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
               >
-                Edit
-              </button>
+                View Details
+              </Link>
             </div>
           ))}
         </div>

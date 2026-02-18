@@ -16,15 +16,13 @@ export default function AdminDashboard() {
   const [weekly, setWeekly] = useState<any[]>([]);
   const [online, setOnline] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
-  const [newUsername, setNewUsername] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [newPassword, setNewPassword] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteLink, setInviteLink] = useState("");
   const [openCreateTask, setOpenCreateTask] = useState(false);
   const [modalTitle, setModalTitle] = useState("");
   const [modalDescription, setModalDescription] = useState("");
   const [modalAssignedTo, setModalAssignedTo] = useState("");
+  const [selectedTask, setSelectedTask] = useState<any>(null);
 
   useEffect(() => {
     const checkRole = async () => {
@@ -42,20 +40,34 @@ export default function AdminDashboard() {
   }, [router]);
 
   useEffect(() => {
-    api.get("/work/admin/dashboard/").then((res) => {
-      setDashboard(res.data);
-    });
-    api.get("/users/").then((res) => setUsers(res.data)).catch(() => setUsers([]));
-    api.get("/work/tasks/all/").then((res) => {
-      setTasks(res.data);
-    });
-    api.get("/work/admin/weekly-stats/").then((res) => {
-      const formatted = res.data.map((item: any) => ({
-        date: item.date,
-        hours: (item.seconds / 3600).toFixed(2),
-      }));
-      setWeekly(formatted);
-    });
+    const loadData = () => {
+      api.get("/work/admin/dashboard/").then((res) => {
+        setDashboard(res.data);
+      });
+      api.get("/users/").then((res) => setUsers(res.data)).catch(() => setUsers([]));
+      api.get("/work/tasks/all/").then((res) => {
+        setTasks(res.data);
+      });
+      api.get("/work/admin/weekly-stats/").then((res) => {
+        const formatted = res.data.map((item: any) => ({
+          date: item.date,
+          hours: (item.seconds / 3600).toFixed(2),
+        }));
+        setWeekly(formatted);
+      });
+    };
+
+    loadData();
+
+    // Auto refresh every 3 seconds
+    const interval = setInterval(() => {
+      api.get("/online-users/").then((res) => setOnline(res.data)).catch(() => setOnline([]));
+      api.get("/work/admin/dashboard/").then((res) => {
+        setDashboard(res.data);
+      }).catch(() => {});
+    }, 3000);
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -83,26 +95,6 @@ export default function AdminDashboard() {
     };
   }, []);
   
-  const createEmployee = async () => {
-    if (!newUsername.trim() || !newPassword.trim()) {
-      toast.error("Username and password required");
-      return;
-    }
-    try {
-      await api.post("/users/create/", {
-        username: newUsername.trim(),
-        email: newEmail.trim(),
-        password: newPassword,
-      });
-      toast.success("Employee created");
-      setNewUsername("");
-      setNewEmail("");
-      setNewPassword("");
-      api.get("/users/").then((res) => setUsers(res.data));
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Failed to create employee");
-    }
-  };
 
   const sendInvite = async () => {
     if (!inviteEmail.trim()) {
@@ -143,10 +135,10 @@ export default function AdminDashboard() {
     }
   };
 
-  if (!dashboard) return <DashboardLayout title="Admin Dashboard"><div>Loading...</div></DashboardLayout>;
+  if (!dashboard) return <DashboardLayout title="Admin Dashboard" role="ADMIN"><div>Loading...</div></DashboardLayout>;
 
   return (
-    <DashboardLayout
+    <DashboardLayout role="ADMIN"
       title="Admin Dashboard"
       sidebarExtra={
         <button
@@ -200,13 +192,34 @@ export default function AdminDashboard() {
 
       <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 mb-6 transition-colors">
         <h2 className="text-lg mb-4 font-medium text-gray-800 dark:text-white">All Tasks</h2>
-        <div className="space-y-2">
+        <div className="space-y-3">
+          {tasks.length === 0 && (
+            <div className="text-gray-500 dark:text-gray-400">No tasks</div>
+          )}
           {tasks.map((task) => (
-            <div key={task.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-3">
-              <div className="font-medium text-gray-800 dark:text-white">{task.title}</div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                Status: {task.status} | Assigned To: {task.assigned_to}
+            <div key={task.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+              <div className="font-semibold text-gray-800 dark:text-white mb-2">{task.title}</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                Assigned: {task.assigned_to || "Unassigned"}
               </div>
+              <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                Created: {task.created_at ? new Date(task.created_at).toLocaleString() : "N/A"}
+              </div>
+              {task.completed_at ? (
+                <div className="text-sm text-green-600 dark:text-green-400 mb-2">
+                  Completed: {new Date(task.completed_at).toLocaleString()}
+                </div>
+              ) : (
+                <div className="text-sm text-yellow-600 dark:text-yellow-400 mb-2">
+                  Status: {task.status}
+                </div>
+              )}
+              <button
+                onClick={() => setSelectedTask(task)}
+                className="mt-2 bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition"
+              >
+                View Details
+              </button>
             </div>
           ))}
         </div>
@@ -237,38 +250,6 @@ export default function AdminDashboard() {
             </code>
           </div>
         )}
-      </div>
-
-      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 mt-6 transition-colors">
-        <h2 className="text-lg mb-4 font-medium text-gray-800 dark:text-white">Create Employee</h2>
-        <div className="flex flex-wrap gap-2 mb-2">
-          <input
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 p-2 rounded"
-            placeholder="Username"
-            value={newUsername}
-            onChange={(e) => setNewUsername(e.target.value)}
-          />
-          <input
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 p-2 rounded"
-            placeholder="Email"
-            type="email"
-            value={newEmail}
-            onChange={(e) => setNewEmail(e.target.value)}
-          />
-          <input
-            type="password"
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 p-2 rounded"
-            placeholder="Password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-          />
-          <button
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
-            onClick={createEmployee}
-          >
-            Create
-          </button>
-        </div>
       </div>
 
       <div className="mb-4 mt-6">

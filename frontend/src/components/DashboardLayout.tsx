@@ -9,14 +9,16 @@ export default function DashboardLayout({
   children,
   title,
   sidebarExtra,
+  role,
 }: {
   children: React.ReactNode;
   title: string;
   sidebarExtra?: React.ReactNode;
+  role?: "ADMIN" | "EMPLOYEE";
 }) {
   const router = useRouter();
   const [dark, setDark] = useState(false);
-  const [me, setMe] = useState<{ organization?: string } | null>(null);
+  const [me, setMe] = useState<{ organization?: string; role?: string } | null>(null);
 
   useEffect(() => {
     const saved = typeof window !== "undefined" ? localStorage.getItem("theme") : null;
@@ -50,15 +52,29 @@ export default function DashboardLayout({
           </h2>
 
           <nav className="flex flex-col gap-3 text-gray-700 dark:text-gray-200">
-            <Link href="/admin" className="hover:text-blue-500 dark:hover:text-blue-400 transition">
-              Dashboard
-            </Link>
-            <Link href="/admin/users" className="hover:text-blue-500 dark:hover:text-blue-400 transition">
-              Users
-            </Link>
-            <Link href="/admin/policy" className="hover:text-blue-500 dark:hover:text-blue-400 transition">
-              Policy
-            </Link>
+            {(!role || role === "ADMIN") && (
+              <>
+                <Link href="/admin" className="hover:text-blue-500 dark:hover:text-blue-400 transition">
+                  Dashboard
+                </Link>
+                <Link href="/admin/users" className="hover:text-blue-500 dark:hover:text-blue-400 transition">
+                  Users
+                </Link>
+                <Link href="/admin/employees" className="hover:text-blue-500 dark:hover:text-blue-400 transition">
+                  Employees
+                </Link>
+                <Link href="/admin/policy" className="hover:text-blue-500 dark:hover:text-blue-400 transition">
+                  Policy
+                </Link>
+              </>
+            )}
+            {role === "EMPLOYEE" && (
+              <>
+                <Link href="/employee" className="hover:text-blue-500 dark:hover:text-blue-400 transition">
+                  My Dashboard
+                </Link>
+              </>
+            )}
           </nav>
 
           {sidebarExtra && <div className="mt-4">{sidebarExtra}</div>}
