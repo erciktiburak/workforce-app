@@ -688,3 +688,78 @@ def admin_user_detail(request, user_id):
             "completion_rate": completion_rate,
         },
     })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_productivity_ranking(request):
+    """
+    Admin için haftalık productivity score ranking.
+
+    Score (0-100):
+    - Work Score  = min(weekly_hours / 40, 1) * 50
+    - Break Score = (1 - break_ratio) * 20
+    - Task Score  = completion_rate * 30
+    """
+    if request.user.role != "ADMIN":
+        return Response(status=403)
+
+    org = request.user.organization
+    if not org:
+        return Response([])
+
+    now = timezone.now()
+    start_date = now.date() - timedelta(days=6)
+
+    users = User.objects.filter(organization=org).only("id", "username")
+
+    ranking = []
+
+    for user in users:
+        sessions = WorkSession.objects.filter(
+            organization=org,
+            user=user,
+            start_at__date__gte=start_date,
+        )
+
+        net_sum = 0
+        break_sum = 0
+        total_sum = 0
+
+        for s in sessions:
+            net, brk, ttl = _net_seconds(s, now)
+            net_sum += net
+            break_sum += brk
+            total_sum += ttl
+
+        weekly_hours = net_sum / 3600
+        break_ratio = (break_sum / total_sum) if total_sum > 0 else 0.0
+
+        tasks_qs = Task.objects.filter(
+            organization=org,
+            assigned_to=user,
+            created_at__date__gte=start_date,
+        )
+        tasks_total = tasks_qs.count()
+        tasks_done = tasks_qs.filter(status="DONE").count()
+
+        completion_rate = (tasks_done / tasks_total) if tasks_total > 0 else 0.0
+
+        work_score = min(weekly_hours / 40, 1) * 50
+        break_score = (1 - break_ratio) * 20
+        task_score = completion_rate * 30
+
+        final_score = round(work_score + break_score + task_score, 1)
+
+        ranking.append({
+            "id": user.id,
+            "username": user.username,
+            "weekly_hours": round(weekly_hours, 2),
+            "completion_rate": round(completion_rate * 100, 1),
+            "break_ratio": round(break_ratio * 100, 1),
+            "score": final_score,
+        })
+
+    ranking.sort(key=lambda x: x["score"], reverse=True)
+
+    return Response(ranking)

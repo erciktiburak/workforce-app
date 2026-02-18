@@ -5,7 +5,7 @@ from .views import (
     policy_view, update_policy, admin_dashboard, weekly_stats,
     create_task, my_tasks, all_tasks, update_task_status,
     my_work_status, my_daily_stats, my_live_session, my_today_timeline,
-    my_analytics, my_weekly, admin_summary, admin_user_detail,
+    my_analytics, my_weekly, admin_summary, admin_user_detail, admin_productivity_ranking,
 )
 
 urlpatterns = [
@@ -31,4 +31,5 @@ urlpatterns = [
     path("analytics/me/weekly/", my_weekly),
     path("analytics/admin/summary/", admin_summary),
     path("analytics/admin/user/<int:user_id>/", admin_user_detail),
+    path("analytics/admin/ranking/", admin_productivity_ranking),
 ]
