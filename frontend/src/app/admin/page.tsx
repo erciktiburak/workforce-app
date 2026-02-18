@@ -16,6 +16,7 @@ export default function AdminDashboard() {
   const [weekly, setWeekly] = useState<any[]>([]);
   const [online, setOnline] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [ranking, setRanking] = useState<any[]>([]);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteLink, setInviteLink] = useState("");
   const [openCreateTask, setOpenCreateTask] = useState(false);
@@ -48,6 +49,9 @@ export default function AdminDashboard() {
       api.get("/work/tasks/all/").then((res) => {
         setTasks(res.data);
       });
+      api.get("/work/analytics/admin/ranking/").then((res) => {
+        setRanking(res.data);
+      }).catch(() => setRanking([]));
       api.get("/work/admin/weekly-stats/").then((res) => {
         const formatted = res.data.map((item: any) => ({
           date: item.date,
@@ -185,6 +189,32 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 mb-6 transition-colors">
+        <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Team Productivity Ranking</h2>
+        {ranking.length === 0 && (
+          <div className="text-gray-500 dark:text-gray-400">No ranking data</div>
+        )}
+        <div className="space-y-2">
+          {ranking.map((u, index) => (
+            <div
+              key={u.id}
+              className="flex items-center justify-between gap-3 p-3 border border-gray-200 dark:border-gray-600 rounded"
+            >
+              <div className="flex items-center gap-2 min-w-[140px]">
+                <div className="text-sm text-gray-500 dark:text-gray-400">#{index + 1}</div>
+                <div className="font-medium text-gray-800 dark:text-white">{u.username}</div>
+              </div>
+
+              <div className="text-sm text-gray-600 dark:text-gray-300">{u.weekly_hours}h</div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">{u.completion_rate}% tasks</div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">{u.break_ratio}% break</div>
+
+              <div className="font-bold text-blue-600 dark:text-blue-400">{u.score}</div>
             </div>
           ))}
         </div>
