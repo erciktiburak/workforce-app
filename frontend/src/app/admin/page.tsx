@@ -17,6 +17,7 @@ export default function AdminDashboard() {
   const [online, setOnline] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [ranking, setRanking] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteLink, setInviteLink] = useState("");
   const [openCreateTask, setOpenCreateTask] = useState(false);
@@ -52,6 +53,9 @@ export default function AdminDashboard() {
       api.get("/work/analytics/admin/ranking/").then((res) => {
         setRanking(res.data);
       }).catch(() => setRanking([]));
+      api.get("/work/analytics/admin/alerts/").then((res) => {
+        setAlerts(res.data);
+      }).catch(() => setAlerts([]));
       api.get("/work/admin/weekly-stats/").then((res) => {
         const formatted = res.data.map((item: any) => ({
           date: item.date,
@@ -193,6 +197,31 @@ export default function AdminDashboard() {
           ))}
         </div>
       </div>
+
+      {/* Alerts Section */}
+      {alerts.length > 0 && (
+        <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700 shadow-lg rounded-xl p-6 mb-6 transition-colors">
+          <h2 className="text-lg font-semibold mb-4 text-red-600 dark:text-red-400">⚠️ Productivity Alerts</h2>
+          <div className="space-y-3">
+            {alerts.map((u) => (
+              <div
+                key={u.id}
+                className="bg-white dark:bg-gray-800 border border-red-200 dark:border-red-800 rounded-lg p-4"
+              >
+                <div className="font-semibold text-gray-800 dark:text-white mb-2">{u.username}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
+                  <div>Score: <span className="font-medium">{u.score}</span></div>
+                  <div>Hours: <span className="font-medium">{u.weekly_hours}h</span></div>
+                  <div>Break: <span className="font-medium">{u.break_ratio}%</span></div>
+                </div>
+                <div className="mt-3 text-sm font-medium text-red-600 dark:text-red-400">
+                  {u.alerts.join(" • ")}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 mb-6 transition-colors">
         <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Team Productivity Ranking</h2>
