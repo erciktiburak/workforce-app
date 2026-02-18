@@ -13,8 +13,6 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [dashboard, setDashboard] = useState<any>(null);
   const [tasks, setTasks] = useState<any[]>([]);
-  const [title, setTitle] = useState("");
-  const [selectedUser, setSelectedUser] = useState("");
   const [weekly, setWeekly] = useState<any[]>([]);
   const [online, setOnline] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -23,6 +21,10 @@ export default function AdminDashboard() {
   const [newPassword, setNewPassword] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteLink, setInviteLink] = useState("");
+  const [openCreateTask, setOpenCreateTask] = useState(false);
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalDescription, setModalDescription] = useState("");
+  const [modalAssignedTo, setModalAssignedTo] = useState("");
 
   useEffect(() => {
     const checkRole = async () => {
@@ -66,7 +68,7 @@ export default function AdminDashboard() {
         setOnline((prev) => {
           const exists = prev.find((u) => u.id === msg.user_id);
           if (exists) return prev;
-          return [...prev, { id: msg.user_id, username: msg.username }];
+          return [...prev, { id: msg.user_id, username: msg.username, status: "online" }];
         });
       }
     };
@@ -81,26 +83,6 @@ export default function AdminDashboard() {
     };
   }, []);
   
-  const createTask = async () => {
-    if (!selectedUser) {
-      toast.error("Please select a user");
-      return;
-    }
-    try {
-      await api.post("/work/tasks/create/", {
-        title,
-        assigned_to: Number(selectedUser),
-      });
-      const res = await api.get("/work/tasks/all/");
-      setTasks(res.data);
-      setTitle("");
-      setSelectedUser("");
-      toast.success("Task created successfully");
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || err.response?.data?.detail || "Failed to create task");
-    }
-  };
-
   const createEmployee = async () => {
     if (!newUsername.trim() || !newPassword.trim()) {
       toast.error("Username and password required");
@@ -138,10 +120,44 @@ export default function AdminDashboard() {
     }
   };
 
+  const createTaskFromModal = async () => {
+    if (!modalAssignedTo) {
+      toast.error("Please select a user");
+      return;
+    }
+    try {
+      await api.post("/work/tasks/create/", {
+        title: modalTitle,
+        description: modalDescription || undefined,
+        assigned_to: Number(modalAssignedTo),
+      });
+      const res = await api.get("/work/tasks/all/");
+      setTasks(res.data);
+      setOpenCreateTask(false);
+      setModalTitle("");
+      setModalDescription("");
+      setModalAssignedTo("");
+      toast.success("Task created");
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || err.response?.data?.detail || "Failed to create task");
+    }
+  };
+
   if (!dashboard) return <DashboardLayout title="Admin Dashboard"><div>Loading...</div></DashboardLayout>;
 
   return (
-    <DashboardLayout title="Admin Dashboard">
+    <DashboardLayout
+      title="Admin Dashboard"
+      sidebarExtra={
+        <button
+          type="button"
+          onClick={() => setOpenCreateTask(true)}
+          className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 transition w-full"
+        >
+          + Create Task
+        </button>
+      }
+    >
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <StatCard title="Total Users" value={dashboard.total_users} />
         <StatCard title="Active Sessions" value={dashboard.active_sessions} />
@@ -152,52 +168,33 @@ export default function AdminDashboard() {
       </div>
 
       <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 mb-6 transition-colors">
-        <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Online Users</h2>
+        <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Team Activity</h2>
         {online.length === 0 && (
-          <div className="text-gray-500 dark:text-gray-400">No active users</div>
+          <div className="text-gray-500 dark:text-gray-400">No team members</div>
         )}
-        <div className="space-y-2">
+        <div className="space-y-3">
           {online.map((u) => (
-            <div
-              key={u.id}
-              className="flex justify-between border-b border-gray-200 dark:border-gray-600 pb-2"
-            >
-              <span className="text-gray-800 dark:text-gray-200">{u.username}</span>
-              <span className="text-green-500 text-sm">● Online</span>
+            <div key={u.id} className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="w-10 h-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-sm font-bold text-gray-700 dark:text-gray-200">
+                    {u.username?.charAt(0)?.toUpperCase() ?? "?"}
+                  </div>
+                  <span
+                    className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-gray-800
+                      ${u.status === "online" || u.status === "working" ? "bg-green-500" : u.status === "idle" || u.status === "break" ? "bg-yellow-400" : "bg-red-500"}
+                    `}
+                  />
+                </div>
+                <div>
+                  <div className="font-medium text-gray-800 dark:text-white">{u.username}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {String(u.status || "offline").toUpperCase()}
+                  </div>
+                </div>
+              </div>
             </div>
           ))}
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 mb-6 transition-colors">
-        <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Create Task</h2>
-        <div className="flex flex-wrap gap-2">
-          <input
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 p-2 flex-1 min-w-[160px] rounded"
-            placeholder="Task Title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-          <select
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 p-2 rounded"
-            value={selectedUser}
-            onChange={(e) => setSelectedUser(e.target.value)}
-          >
-            <option value="">Select User</option>
-            {users
-              .filter((u) => u.role === "EMPLOYEE")
-              .map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.username}
-                </option>
-              ))}
-          </select>
-          <button
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-            onClick={createTask}
-          >
-            Create
-          </button>
         </div>
       </div>
 
@@ -292,6 +289,52 @@ export default function AdminDashboard() {
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      {openCreateTask && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setOpenCreateTask(false)}>
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl w-96 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Create Task</h2>
+            <input
+              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 p-2 w-full rounded mb-3"
+              placeholder="Title"
+              value={modalTitle}
+              onChange={(e) => setModalTitle(e.target.value)}
+            />
+            <textarea
+              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 p-2 w-full rounded mb-3 min-h-[80px]"
+              placeholder="Description"
+              value={modalDescription}
+              onChange={(e) => setModalDescription(e.target.value)}
+            />
+            <select
+              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 p-2 w-full rounded mb-4"
+              value={modalAssignedTo}
+              onChange={(e) => setModalAssignedTo(e.target.value)}
+            >
+              <option value="">Select user</option>
+              {users.filter((u) => u.role === "EMPLOYEE").map((u) => (
+                <option key={u.id} value={u.id}>{u.username}</option>
+              ))}
+            </select>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+                onClick={createTaskFromModal}
+              >
+                Create
+              </button>
+              <button
+                type="button"
+                className="flex-1 bg-gray-500 text-white py-2 rounded hover:bg-gray-600 transition"
+                onClick={() => setOpenCreateTask(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

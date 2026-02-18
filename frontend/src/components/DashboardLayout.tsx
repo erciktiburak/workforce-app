@@ -8,13 +8,26 @@ import { useState, useEffect } from "react";
 export default function DashboardLayout({
   children,
   title,
+  sidebarExtra,
 }: {
   children: React.ReactNode;
   title: string;
+  sidebarExtra?: React.ReactNode;
 }) {
   const router = useRouter();
   const [dark, setDark] = useState(false);
   const [me, setMe] = useState<{ organization?: string } | null>(null);
+
+  useEffect(() => {
+    const saved = typeof window !== "undefined" ? localStorage.getItem("theme") : null;
+    if (saved === "dark") setDark(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("theme", dark ? "dark" : "light");
+    }
+  }, [dark]);
 
   useEffect(() => {
     api.get("/me/").then((res) => setMe(res.data)).catch(() => {});
@@ -40,10 +53,15 @@ export default function DashboardLayout({
             <Link href="/admin" className="hover:text-blue-500 dark:hover:text-blue-400 transition">
               Dashboard
             </Link>
+            <Link href="/admin/users" className="hover:text-blue-500 dark:hover:text-blue-400 transition">
+              Users
+            </Link>
             <Link href="/admin/policy" className="hover:text-blue-500 dark:hover:text-blue-400 transition">
               Policy
             </Link>
           </nav>
+
+          {sidebarExtra && <div className="mt-4">{sidebarExtra}</div>}
 
           <div className="mt-8">
             <button

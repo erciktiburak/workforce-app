@@ -9,6 +9,7 @@ import toast from "react-hot-toast";
 export default function EmployeeDashboard() {
   const router = useRouter();
   const [tasks, setTasks] = useState<any[]>([]);
+  const [onBreak, setOnBreak] = useState(false);
 
   useEffect(() => {
     const checkRole = async () => {
@@ -80,9 +81,29 @@ export default function EmployeeDashboard() {
     }
   };
 
+  const startBreak = async () => {
+    try {
+      await api.post("/work/break/session/start/");
+      setOnBreak(true);
+      toast.success("Break started");
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Failed to start break");
+    }
+  };
+
+  const endBreak = async () => {
+    try {
+      await api.post("/work/break/session/end/");
+      setOnBreak(false);
+      toast.success("Break ended");
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Failed to end break");
+    }
+  };
+
   return (
     <DashboardLayout title="Employee Panel">
-      <div className="mb-6 flex gap-2">
+      <div className="mb-6 flex flex-wrap gap-2">
         <button 
           className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition" 
           onClick={startWork}
@@ -94,6 +115,18 @@ export default function EmployeeDashboard() {
           onClick={stopWork}
         >
           Stop Work
+        </button>
+        <button
+          className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition"
+          onClick={startBreak}
+        >
+          Break
+        </button>
+        <button
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+          onClick={endBreak}
+        >
+          Resume
         </button>
       </div>
 

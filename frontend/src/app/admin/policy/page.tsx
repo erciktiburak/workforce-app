@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { useRouter } from "next/navigation";
+import DashboardLayout from "@/components/DashboardLayout";
+import toast from "react-hot-toast";
 
 type Policy = {
   daily_work_minutes: number;
@@ -25,7 +27,6 @@ export default function AdminPolicyPage() {
           router.push("/employee");
           return;
         }
-
         const res = await api.get("/work/policy/");
         setPolicy(res.data);
       } catch (e) {
@@ -39,29 +40,33 @@ export default function AdminPolicyPage() {
     try {
       setSaving(true);
       await api.put("/work/policy/update/", policy);
-      alert("Policy updated");
+      toast.success("Policy updated");
     } catch (err: any) {
-      console.error(err.response?.data);
-      alert("Update failed");
+      toast.error(err.response?.data?.detail || "Update failed");
     } finally {
       setSaving(false);
     }
   };
 
-  if (!policy) return <div className="p-6">Loading...</div>;
+  if (!policy) return <DashboardLayout title="Work Policy"><div className="p-6">Loading...</div></DashboardLayout>;
 
   const fixedDisabled = policy.break_mode !== "FIXED";
 
   return (
-    <div className="p-6 max-w-xl">
-      <h1 className="text-2xl mb-4">Work Policy</h1>
+    <DashboardLayout title="Work Policy">
+      <button
+        onClick={() => router.push("/admin")}
+        className="mb-6 bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition"
+      >
+        ← Back to Dashboard
+      </button>
 
-      <div className="border rounded p-4 space-y-4">
+      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 max-w-xl transition-colors space-y-4">
         <div>
-          <label className="block mb-1">Daily work minutes</label>
+          <label className="block mb-1 text-gray-800 dark:text-white">Daily work minutes</label>
           <input
             type="number"
-            className="border p-2 w-full"
+            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 p-2 w-full rounded"
             value={policy.daily_work_minutes}
             onChange={(e) =>
               setPolicy({ ...policy, daily_work_minutes: Number(e.target.value) })
@@ -70,10 +75,10 @@ export default function AdminPolicyPage() {
         </div>
 
         <div>
-          <label className="block mb-1">Daily break minutes</label>
+          <label className="block mb-1 text-gray-800 dark:text-white">Daily break minutes</label>
           <input
             type="number"
-            className="border p-2 w-full"
+            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 p-2 w-full rounded"
             value={policy.daily_break_minutes}
             onChange={(e) =>
               setPolicy({ ...policy, daily_break_minutes: Number(e.target.value) })
@@ -82,9 +87,9 @@ export default function AdminPolicyPage() {
         </div>
 
         <div>
-          <label className="block mb-1">Break mode</label>
+          <label className="block mb-1 text-gray-800 dark:text-white">Break mode</label>
           <select
-            className="border p-2 w-full"
+            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 p-2 w-full rounded"
             value={policy.break_mode}
             onChange={(e) =>
               setPolicy({ ...policy, break_mode: e.target.value as Policy["break_mode"] })
@@ -96,10 +101,10 @@ export default function AdminPolicyPage() {
         </div>
 
         <div>
-          <label className="block mb-1">Fixed break start (HH:MM)</label>
+          <label className="block mb-1 text-gray-800 dark:text-white">Fixed break start (HH:MM)</label>
           <input
             type="time"
-            className="border p-2 w-full"
+            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 p-2 w-full rounded disabled:opacity-50"
             disabled={fixedDisabled}
             value={policy.fixed_break_start ?? ""}
             onChange={(e) =>
@@ -109,10 +114,10 @@ export default function AdminPolicyPage() {
         </div>
 
         <div>
-          <label className="block mb-1">Fixed break end (HH:MM)</label>
+          <label className="block mb-1 text-gray-800 dark:text-white">Fixed break end (HH:MM)</label>
           <input
             type="time"
-            className="border p-2 w-full"
+            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 p-2 w-full rounded disabled:opacity-50"
             disabled={fixedDisabled}
             value={policy.fixed_break_end ?? ""}
             onChange={(e) =>
@@ -122,13 +127,13 @@ export default function AdminPolicyPage() {
         </div>
 
         <button
-          className="bg-blue-600 text-white p-2 w-full disabled:opacity-50"
+          className="bg-blue-600 text-white p-2 w-full rounded disabled:opacity-50 hover:bg-blue-700 transition"
           onClick={save}
           disabled={saving}
         >
           {saving ? "Saving..." : "Save Policy"}
         </button>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }
