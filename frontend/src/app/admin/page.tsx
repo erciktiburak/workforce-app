@@ -311,10 +311,21 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      <div className="mb-4 mt-6">
+      <div className="mb-4 mt-6 flex items-center gap-4">
         <Link className="underline text-blue-400 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300" href="/admin/policy">
           Manage Work Policy
         </Link>
+        <button
+          onClick={() => {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth() + 1;
+            window.open(`http://127.0.0.1:8000/api/work/reports/admin/monthly-csv/?year=${year}&month=${month}`, "_blank");
+          }}
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
+        >
+          Download Monthly CSV
+        </button>
       </div>
 
       <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 mt-8 transition-colors">

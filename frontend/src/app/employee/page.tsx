@@ -313,6 +313,22 @@ export default function EmployeeDashboard() {
         <h2 className="text-lg mb-4 font-medium text-gray-800 dark:text-white">Today's Timeline</h2>
         <TimelineVisualization />
       </div>
+
+      {/* Monthly Report Download */}
+      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 transition-colors mt-6">
+        <h2 className="text-lg mb-4 font-medium text-gray-800 dark:text-white">Monthly Report</h2>
+        <button
+          onClick={() => {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth() + 1;
+            window.open(`http://127.0.0.1:8000/api/work/reports/me/monthly-pdf/?year=${year}&month=${month}`, "_blank");
+          }}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+        >
+          Download Monthly PDF
+        </button>
+      </div>
     </DashboardLayout>
   );
 }
