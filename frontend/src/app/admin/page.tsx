@@ -331,7 +331,7 @@ export default function AdminDashboard() {
 
       <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 mb-6 transition-colors">
         <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Invite Employee</h2>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col md:flex-row gap-2">
           <input
             className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 p-2 flex-1 min-w-[180px] rounded"
             placeholder="Employee Email"
@@ -340,7 +340,7 @@ export default function AdminDashboard() {
             onChange={(e) => setInviteEmail(e.target.value)}
           />
           <button
-            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition"
+            className="w-full md:w-auto bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition"
             onClick={sendInvite}
           >
             Send Invite
@@ -356,7 +356,7 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      <div className="mb-4 mt-6 flex items-center gap-4">
+      <div className="mb-4 mt-6 flex flex-col md:flex-row items-start md:items-center gap-3 md:gap-4">
         <Link className="underline text-blue-400 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300" href="/admin/policy">
           Manage Work Policy
         </Link>
@@ -381,11 +381,12 @@ export default function AdminDashboard() {
               link.click();
               link.remove();
               window.URL.revokeObjectURL(url);
+              toast.success("CSV downloaded successfully");
             } catch (err: any) {
               toast.error(err.response?.data?.detail || "Failed to download CSV");
             }
           }}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
+          className="w-full md:w-auto bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
         >
           Download Monthly CSV
         </button>
@@ -393,7 +394,7 @@ export default function AdminDashboard() {
 
       <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 mt-8 transition-colors">
         <h2 className="text-lg mb-4 font-medium text-gray-800 dark:text-white">Weekly Work Hours</h2>
-        <ResponsiveContainer width="100%" height={300}>
+        <ResponsiveContainer width="100%" height={250}>
           <LineChart data={weekly}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="date" />

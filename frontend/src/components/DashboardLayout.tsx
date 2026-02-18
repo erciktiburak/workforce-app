@@ -18,18 +18,20 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const [dark, setDark] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [me, setMe] = useState<{ organization?: string; role?: string } | null>(null);
 
   useEffect(() => {
+    setMounted(true);
     const saved = typeof window !== "undefined" ? localStorage.getItem("theme") : null;
     if (saved === "dark") setDark(true);
   }, []);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (mounted && typeof window !== "undefined") {
       localStorage.setItem("theme", dark ? "dark" : "light");
     }
-  }, [dark]);
+  }, [dark, mounted]);
 
   useEffect(() => {
     api.get("/me/").then((res) => setMe(res.data)).catch(() => {});
@@ -42,11 +44,15 @@ export default function DashboardLayout({
     router.push("/login");
   };
 
+  if (!mounted) {
+    return null;
+  }
+
   return (
     <div className={dark ? "dark" : ""}>
-      <div className="flex min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors">
+      <div className="flex flex-col md:flex-row min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors">
         {/* Sidebar */}
-        <aside className="w-64 bg-white dark:bg-gray-800 shadow-md p-5 flex flex-col">
+        <aside className="w-full md:w-64 bg-white dark:bg-gray-800 shadow-md p-5 flex flex-col">
           <h2 className="text-xl font-bold mb-6 text-gray-800 dark:text-white">
             Workforce
           </h2>
@@ -102,7 +108,7 @@ export default function DashboardLayout({
         </aside>
 
         {/* Content */}
-        <main className="flex-1 p-8 overflow-auto">
+        <main className="flex-1 p-4 md:p-8 overflow-auto">
           <h1 className="text-2xl font-semibold mb-2 text-gray-800 dark:text-white">
             {title}
           </h1>

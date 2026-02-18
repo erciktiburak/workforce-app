@@ -143,7 +143,7 @@ export default function AdminUsersPage() {
       {selectedUser && (
         <div className="fixed inset-0 bg-black/40 flex justify-end z-50" onClick={closeDrawer}>
           <div
-            className="w-96 max-w-[90vw] h-full bg-white dark:bg-gray-800 p-6 shadow-lg overflow-y-auto"
+            className="w-full md:w-96 max-w-[90vw] h-full bg-white dark:bg-gray-800 p-4 md:p-6 shadow-lg overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 mb-4">
@@ -221,15 +221,17 @@ export default function AdminUsersPage() {
                   <div className="text-sm font-medium text-gray-800 dark:text-white mb-2">
                     Weekly Net Hours
                   </div>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={detail.weekly || []}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" hide />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="hours" fill="#2563eb" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <div className="w-full" style={{ height: "200px" }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={detail.weekly || []}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" hide />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="hours" fill="#2563eb" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               </>
             )}
