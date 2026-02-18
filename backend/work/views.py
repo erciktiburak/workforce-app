@@ -5,7 +5,8 @@ from rest_framework.response import Response
 from .services import start_session, stop_session, start_break, end_break
 from .models import WorkPolicy
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime
+from calendar import monthrange
 from accounts.models import User
 from accounts.utils import resolve_user_status
 from .models import WorkSession
@@ -14,6 +15,9 @@ from django.db.models import Sum, F, ExpressionWrapper, DurationField
 from django.db.models.functions import TruncDate
 from .models import Task
 from .serializers import TaskSerializer
+import csv
+from django.http import HttpResponse
+from io import BytesIO
 
 
 def _net_seconds(session: WorkSession, now):
@@ -755,10 +759,9 @@ def admin_alerts(request):
         weekly_hours = net_sum / 3600
         break_ratio = (break_sum / total_sum) if total_sum > 0 else 0.0
 
-        # Productivity score hesapla (task score olmadan)
         work_score = min(weekly_hours / 40, 1) * 50
         break_score = (1 - break_ratio) * 20
-        task_score = 0  # Alert için task score'u hesaplamıyoruz
+        task_score = 0  
 
         score = work_score + break_score + task_score
 
@@ -787,3 +790,140 @@ def admin_alerts(request):
             })
 
     return Response(alerts)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_monthly_csv(request):
+    """
+    Admin için aylık çalışma raporu CSV export.
+    Query params: year, month
+    """
+    if request.user.role != "ADMIN":
+        return Response(status=403)
+
+    org = request.user.organization
+    if not org:
+        return Response({"error": "No organization"}, status=400)
+
+    try:
+        year = int(request.GET.get("year", timezone.now().year))
+        month = int(request.GET.get("month", timezone.now().month))
+    except (ValueError, TypeError):
+        return Response({"error": "Invalid year or month"}, status=400)
+
+    last_day = monthrange(year, month)[1]
+    start_date = timezone.make_aware(datetime(year, month, 1))
+    end_date = timezone.make_aware(datetime(year, month, last_day, 23, 59, 59))
+
+    sessions = WorkSession.objects.filter(
+        organization=org,
+        start_at__range=(start_date, end_date),
+    ).select_related("user").order_by("user__username", "start_at")
+
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="monthly_report_{year}_{month:02d}.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow([
+        "Username",
+        "Start Time",
+        "End Time",
+        "Net Hours",
+        "Break Minutes",
+    ])
+
+    now = timezone.now()
+    for s in sessions:
+        net, brk, ttl = _net_seconds(s, now)
+        writer.writerow([
+            s.user.username,
+            s.start_at.isoformat() if s.start_at else "",
+            s.end_at.isoformat() if s.end_at else "",
+            round(net / 3600, 2),
+            round(brk / 60, 1),
+        ])
+
+    return response
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_monthly_pdf(request):
+    """
+    Employee için aylık PDF raporu.
+    Query params: year, month
+    """
+    try:
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib import colors
+    except ImportError:
+        return Response(
+            {"error": "reportlab not installed. Run: pip install reportlab"},
+            status=500,
+        )
+
+    try:
+        year = int(request.GET.get("year", timezone.now().year))
+        month = int(request.GET.get("month", timezone.now().month))
+    except (ValueError, TypeError):
+        return Response({"error": "Invalid year or month"}, status=400)
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=(612, 792))
+    elements = []
+
+    styles = getSampleStyleSheet()
+    elements.append(Paragraph(f"Monthly Work Report - {month}/{year}", styles["Heading1"]))
+    elements.append(Spacer(1, 20))
+
+    sessions = WorkSession.objects.filter(
+        user=request.user,
+        start_at__year=year,
+        start_at__month=month,
+    ).order_by("start_at")
+
+    now = timezone.now()
+
+    # Summary
+    total_net = 0
+    total_break = 0
+    total_sessions = sessions.count()
+
+    for s in sessions:
+        net, brk, ttl = _net_seconds(s, now)
+        total_net += net
+        total_break += brk
+
+    elements.append(Paragraph(f"Total Sessions: {total_sessions}", styles["Normal"]))
+    elements.append(Paragraph(f"Total Net Hours: {round(total_net / 3600, 2)}", styles["Normal"]))
+    elements.append(Paragraph(f"Total Break Minutes: {round(total_break / 60, 1)}", styles["Normal"]))
+    elements.append(Spacer(1, 20))
+
+    # Table
+    data = [["Date", "Start Time", "End Time", "Net Hours", "Break Minutes"]]
+
+    for s in sessions:
+        net, brk, ttl = _net_seconds(s, now)
+        data.append([
+            s.start_at.date().isoformat() if s.start_at else "",
+            s.start_at.strftime("%H:%M") if s.start_at else "",
+            s.end_at.strftime("%H:%M") if s.end_at else "Ongoing",
+            str(round(net / 3600, 2)),
+            str(round(brk / 60, 1)),
+        ])
+
+    if len(data) > 1:
+        table = Table(data)
+        elements.append(table)
+    else:
+        elements.append(Paragraph("No sessions found for this month.", styles["Normal"]))
+
+    doc.build(elements)
+    buffer.seek(0)
+
+    response = HttpResponse(buffer, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="monthly_report_{month:02d}_{year}.pdf"'
+
+    return response
