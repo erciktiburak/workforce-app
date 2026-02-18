@@ -17,14 +17,7 @@ from .serializers import TaskSerializer
 
 
 def _net_seconds(session: WorkSession, now):
-    """
-    Bir WorkSession için net çalışma süresini hesaplar.
 
-    Dönüş:
-    - net: (end - start) - break
-    - break: tüm break süresi (devam eden break dahil)
-    - total: (end - start)
-    """
     end = session.end_at or now
     total = (end - session.start_at).total_seconds()
     total_break = session.total_break_seconds or 0
@@ -202,10 +195,7 @@ def start_work(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def stop_work(request):
-    """
-    Stop work: Eğer break'teyse break süresini hesapla ve ekle,
-    sonra session'ı kapat.
-    """
+
     session = WorkSession.objects.filter(
         user=request.user,
         end_at__isnull=True,
@@ -250,9 +240,7 @@ def break_end(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def session_break_start(request):
-    """
-    Break başlatma: break_start zamanını kaydet.
-    """
+
     session = WorkSession.objects.filter(
         user=request.user,
         end_at__isnull=True,
@@ -269,10 +257,7 @@ def session_break_start(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def session_break_end(request):
-    """
-    Break bitirme: break süresini hesapla ve total_break_seconds'a ekle,
-    break_start'ı temizle.
-    """
+
     session = WorkSession.objects.filter(
         user=request.user,
         end_at__isnull=True,
@@ -349,10 +334,7 @@ def update_policy(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def my_work_status(request):
-    """
-    Employee için aktif session kontrolü.
-    Start butonu disable için kullanılır.
-    """
+
     session = WorkSession.objects.filter(
         user=request.user,
         end_at__isnull=True,
@@ -365,9 +347,7 @@ def my_work_status(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def my_daily_stats(request):
-    """
-    Employee için günlük çalışma istatistikleri.
-    """
+
     sessions = WorkSession.objects.filter(
         user=request.user,
         start_at__date=timezone.now().date()
@@ -388,10 +368,7 @@ def my_daily_stats(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def my_live_session(request):
-    """
-    Aktif session için gerçek zamanlı veri döndürür.
-    Kronometre için kullanılır.
-    """
+
     session = WorkSession.objects.filter(
         user=request.user,
         end_at__isnull=True,
@@ -403,14 +380,11 @@ def my_live_session(request):
 
     now = timezone.now()
 
-    # Toplam çalışma süresi: (şimdi - başlangıç) - toplam break süresi
     worked = (now - session.start_at).total_seconds()
     worked -= session.total_break_seconds
 
-    # Eğer şu an break'teyse, şu anki break süresini de ekle
     if session.break_start:
         break_now = (now - session.break_start).total_seconds()
-        # Toplam break süresi: önceki breakler + şu anki break
         total_break = session.total_break_seconds + break_now
     else:
         total_break = session.total_break_seconds
@@ -455,12 +429,7 @@ def my_today_timeline(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def my_analytics(request):
-    """
-    Employee için günlük özet analytics:
-    - work (net)
-    - break
-    - total
-    """
+
     now = timezone.now()
     today = now.date()
 
@@ -519,12 +488,7 @@ def my_weekly(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def admin_summary(request):
-    """
-    Admin için takım haftalık özeti:
-    - top workers
-    - break ratio
-    - task completion rate
-    """
+
     if request.user.role != "ADMIN":
         return Response(status=403)
 
@@ -595,14 +559,7 @@ def admin_summary(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def admin_user_detail(request, user_id):
-    """
-    Admin için kullanıcı detay analytics paneli:
-    - status
-    - today start time / net / break / total
-    - weekly net hours (last 7 days)
-    - active task
-    - task completion rate (assigned tasks)
-    """
+
     if request.user.role != "ADMIN":
         return Response(status=403)
 
@@ -693,14 +650,7 @@ def admin_user_detail(request, user_id):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def admin_productivity_ranking(request):
-    """
-    Admin için haftalık productivity score ranking.
 
-    Score (0-100):
-    - Work Score  = min(weekly_hours / 40, 1) * 50
-    - Break Score = (1 - break_ratio) * 20
-    - Task Score  = completion_rate * 30
-    """
     if request.user.role != "ADMIN":
         return Response(status=403)
 
@@ -763,3 +713,77 @@ def admin_productivity_ranking(request):
     ranking.sort(key=lambda x: x["score"], reverse=True)
 
     return Response(ranking)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_alerts(request):
+
+    if request.user.role != "ADMIN":
+        return Response(status=403)
+
+    org = request.user.organization
+    if not org:
+        return Response([])
+
+    now = timezone.now()
+    start_date = now.date() - timedelta(days=6)
+
+    users = User.objects.filter(organization=org).only("id", "username")
+
+    alerts = []
+
+    for user in users:
+        sessions = WorkSession.objects.filter(
+            organization=org,
+            user=user,
+            start_at__date__gte=start_date,
+        )
+
+        net_sum = 0
+        break_sum = 0
+        total_sum = 0
+        active_days = set()
+
+        for s in sessions:
+            net, brk, ttl = _net_seconds(s, now)
+            net_sum += net
+            break_sum += brk
+            total_sum += ttl
+            active_days.add(s.start_at.date())
+
+        weekly_hours = net_sum / 3600
+        break_ratio = (break_sum / total_sum) if total_sum > 0 else 0.0
+
+        # Productivity score hesapla (task score olmadan)
+        work_score = min(weekly_hours / 40, 1) * 50
+        break_score = (1 - break_ratio) * 20
+        task_score = 0  # Alert için task score'u hesaplamıyoruz
+
+        score = work_score + break_score + task_score
+
+        user_alerts = []
+
+        if score < 50:
+            user_alerts.append("LOW_PRODUCTIVITY")
+
+        if break_ratio > 0.35:
+            user_alerts.append("HIGH_BREAK_RATIO")
+
+        if weekly_hours < 5:
+            user_alerts.append("LOW_ACTIVITY")
+
+        if len(active_days) <= 1:
+            user_alerts.append("INACTIVE")
+
+        if user_alerts:
+            alerts.append({
+                "id": user.id,
+                "username": user.username,
+                "alerts": user_alerts,
+                "score": round(score, 1),
+                "weekly_hours": round(weekly_hours, 1),
+                "break_ratio": round(break_ratio * 100, 1),
+            })
+
+    return Response(alerts)
