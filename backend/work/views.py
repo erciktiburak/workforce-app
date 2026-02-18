@@ -93,9 +93,23 @@ def all_tasks(request):
     org = request.user.organization
     if not org:
         return Response([])
-    tasks = Task.objects.filter(organization=org)
-    serializer = TaskSerializer(tasks, many=True)
-    return Response(serializer.data)
+    tasks = Task.objects.filter(organization=org).select_related("assigned_to", "created_by")
+    
+    # Custom serializer response with username
+    data = []
+    for t in tasks:
+        data.append({
+            "id": t.id,
+            "title": t.title,
+            "description": t.description,
+            "assigned_to": t.assigned_to.username if t.assigned_to else None,
+            "assigned_to_id": t.assigned_to.id if t.assigned_to else None,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+            "completed_at": t.completed_at.isoformat() if t.completed_at else None,
+            "status": t.status,
+        })
+    
+    return Response(data)
 
 @api_view(["PATCH"])
 @permission_classes([IsAuthenticated])
@@ -166,11 +180,31 @@ def start_work(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def stop_work(request):
-    try:
-        stop_session(request.user)
-        return Response({"status": "stopped"})
-    except Exception as e:
-        return Response({"error": str(e)}, status=400)
+    """
+    Stop work: Eğer break'teyse break süresini hesapla ve ekle,
+    sonra session'ı kapat.
+    """
+    session = WorkSession.objects.filter(
+        user=request.user,
+        end_at__isnull=True,
+        status="OPEN",
+    ).first()
+    
+    if not session:
+        return Response({"error": "No active session"}, status=400)
+    
+    # Eğer break'teyse, break süresini hesapla ve ekle
+    if session.break_start:
+        diff = int((timezone.now() - session.break_start).total_seconds())
+        session.total_break_seconds += diff
+        session.break_start = None
+        session.on_break = False
+    
+    session.end_at = timezone.now()
+    session.status = WorkSession.Status.CLOSED
+    session.save(update_fields=["end_at", "status", "break_start", "on_break", "total_break_seconds"])
+    
+    return Response({"status": "stopped"})
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -194,6 +228,9 @@ def break_end(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def session_break_start(request):
+    """
+    Break başlatma: break_start zamanını kaydet.
+    """
     session = WorkSession.objects.filter(
         user=request.user,
         end_at__isnull=True,
@@ -210,6 +247,10 @@ def session_break_start(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def session_break_end(request):
+    """
+    Break bitirme: break süresini hesapla ve total_break_seconds'a ekle,
+    break_start'ı temizle.
+    """
     session = WorkSession.objects.filter(
         user=request.user,
         end_at__isnull=True,
@@ -218,8 +259,8 @@ def session_break_end(request):
     if not session:
         return Response({"error": "No active session"}, status=400)
     if session.break_start:
-        break_duration = int((timezone.now() - session.break_start).total_seconds())
-        session.total_break_seconds += break_duration
+        diff = int((timezone.now() - session.break_start).total_seconds())
+        session.total_break_seconds += diff
     session.break_start = None
     session.on_break = False
     session.save(update_fields=["break_start", "on_break", "total_break_seconds"])
@@ -281,3 +322,109 @@ def update_policy(request):
     policy.save()
 
     return Response({"ok": True})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_work_status(request):
+    """
+    Employee için aktif session kontrolü.
+    Start butonu disable için kullanılır.
+    """
+    session = WorkSession.objects.filter(
+        user=request.user,
+        end_at__isnull=True,
+        status="OPEN"
+    ).exists()
+
+    return Response({"active": session})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_daily_stats(request):
+    """
+    Employee için günlük çalışma istatistikleri.
+    """
+    sessions = WorkSession.objects.filter(
+        user=request.user,
+        start_at__date=timezone.now().date()
+    )
+
+    total = 0
+    now = timezone.now()
+
+    for s in sessions:
+        if s.end_at:
+            seconds = (s.end_at - s.start_at).total_seconds()
+        else:
+            seconds = (now - s.start_at).total_seconds()
+
+        seconds -= s.total_break_seconds
+        total += max(0, seconds)
+
+    return Response({
+        "today_seconds": int(total)
+    })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_live_session(request):
+    """
+    Aktif session için gerçek zamanlı veri döndürür.
+    Kronometre için kullanılır.
+    """
+    session = WorkSession.objects.filter(
+        user=request.user,
+        end_at__isnull=True,
+        status="OPEN"
+    ).first()
+
+    if not session:
+        return Response({"active": False})
+
+    now = timezone.now()
+
+    # Toplam çalışma süresi: (şimdi - başlangıç) - toplam break süresi
+    worked = (now - session.start_at).total_seconds()
+    worked -= session.total_break_seconds
+
+    # Eğer şu an break'teyse, şu anki break süresini de ekle
+    if session.break_start:
+        break_now = (now - session.break_start).total_seconds()
+        # Toplam break süresi: önceki breakler + şu anki break
+        total_break = session.total_break_seconds + break_now
+    else:
+        total_break = session.total_break_seconds
+
+    return Response({
+        "active": True,
+        "on_break": bool(session.break_start),
+        "work_seconds": int(max(0, worked)),
+        "break_seconds": int(total_break),
+    })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_today_timeline(request):
+    """
+    Employee için günlük timeline verisi.
+    Timeline visualization için kullanılır.
+    """
+    sessions = WorkSession.objects.filter(
+        user=request.user,
+        start_at__date=timezone.now().date()
+    ).order_by("start_at")
+
+    data = []
+
+    for s in sessions:
+        data.append({
+            "start": s.start_at.isoformat() if s.start_at else None,
+            "end": s.end_at.isoformat() if s.end_at else None,
+            "break_seconds": s.total_break_seconds,
+        })
+
+    return Response(data)
