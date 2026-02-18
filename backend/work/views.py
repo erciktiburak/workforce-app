@@ -927,3 +927,99 @@ def my_monthly_pdf(request):
     response["Content-Disposition"] = f'attachment; filename="monthly_report_{month:02d}_{year}.pdf"'
 
     return response
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_patterns(request):
+    """
+    Admin için davranış pattern detection.
+    Son 2 haftayı karşılaştırarak trend analizi yapar.
+    
+    Pattern'ler:
+    - SIGNIFICANT_PRODUCTIVITY_DROP: %30+ saat düşüşü
+    - BREAK_INCREASE_PATTERN: Break oranında %15+ artış
+    - SUDDEN_ACTIVITY_LOSS: Yüksek aktiviteden düşük aktiviteye ani geçiş
+    """
+    if request.user.role != "ADMIN":
+        return Response(status=403)
+
+    org = request.user.organization
+    if not org:
+        return Response([])
+
+    now = timezone.now()
+
+    week_current_start = now.date() - timedelta(days=6)
+    week_prev_start = now.date() - timedelta(days=13)
+    week_prev_end = now.date() - timedelta(days=7)
+
+    users = User.objects.filter(organization=org).only("id", "username")
+
+    results = []
+
+    for user in users:
+        # Current week
+        current_sessions = WorkSession.objects.filter(
+            organization=org,
+            user=user,
+            start_at__date__gte=week_current_start,
+        )
+
+        # Previous week
+        prev_sessions = WorkSession.objects.filter(
+            organization=org,
+            user=user,
+            start_at__date__range=(week_prev_start, week_prev_end),
+        )
+
+        def calc(sessions):
+            net = 0
+            brk = 0
+            ttl = 0
+
+            for s in sessions:
+                n, b, t = _net_seconds(s, now)
+                net += n
+                brk += b
+                ttl += t
+
+            hours = net / 3600
+            break_ratio = (brk / ttl) if ttl > 0 else 0.0
+
+            return hours, break_ratio
+
+        curr_hours, curr_break = calc(current_sessions)
+        prev_hours, prev_break = calc(prev_sessions)
+
+        hour_change = 0.0
+        if prev_hours > 0:
+            hour_change = ((curr_hours - prev_hours) / prev_hours) * 100
+        elif curr_hours > 0:
+            hour_change = 100.0  # 0'dan başladı
+
+        break_change = (curr_break - prev_break) * 100
+
+        alerts = []
+
+        if hour_change < -30:
+            alerts.append("SIGNIFICANT_PRODUCTIVITY_DROP")
+
+        if break_change > 15:
+            alerts.append("BREAK_INCREASE_PATTERN")
+
+        if curr_hours < 5 and prev_hours > 15:
+            alerts.append("SUDDEN_ACTIVITY_LOSS")
+
+        if alerts:
+            results.append({
+                "id": user.id,
+                "username": user.username,
+                "hour_change_percent": round(hour_change, 1),
+                "break_change_percent": round(break_change, 1),
+                "current_hours": round(curr_hours, 1),
+                "previous_hours": round(prev_hours, 1),
+                "alerts": alerts,
+            })
+
+    return Response(results)
