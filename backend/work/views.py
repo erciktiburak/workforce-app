@@ -18,6 +18,7 @@ from .serializers import TaskSerializer
 import csv
 from django.http import HttpResponse
 from io import BytesIO
+from audit.utils import write_audit
 
 
 def _net_seconds(session: WorkSession, now):
@@ -89,9 +90,21 @@ def create_task(request):
 
     serializer = TaskSerializer(data=data)
     if serializer.is_valid():
-        serializer.save(
+        task = serializer.save(
             created_by=request.user,
             organization=org,
+        )
+        # Audit log
+        write_audit(
+            request,
+            action="TASK_CREATED",
+            entity_type="Task",
+            entity_id=task.id,
+            metadata={
+                "title": task.title,
+                "assigned_to": task.assigned_to_id,
+                "status": task.status,
+            },
         )
         return Response(serializer.data)
     return Response(serializer.errors, status=400)
@@ -146,10 +159,23 @@ def update_task_status(request, task_id):
     if new_status not in Task.Status.values:
         return Response({"error": "Invalid status"}, status=400)
 
+    old_status = task.status
     task.status = new_status
     if new_status == "DONE":
         task.completed_at = timezone.now()
     task.save()
+
+    # Audit log
+    write_audit(
+        request,
+        action="TASK_STATUS_CHANGED",
+        entity_type="Task",
+        entity_id=task.id,
+        metadata={
+            "from": old_status,
+            "to": new_status,
+        },
+    )
 
     return Response({"status": "updated"})
 
@@ -192,6 +218,16 @@ def admin_dashboard(request):
 def start_work(request):
     try:
         session = start_session(request.user)
+        # Audit log
+        write_audit(
+            request,
+            action="WORK_STARTED",
+            entity_type="WorkSession",
+            entity_id=session.id,
+            metadata={
+                "start_at": session.start_at.isoformat() if session.start_at else None,
+            },
+        )
         return Response({"status": "started", "session_id": session.id})
     except Exception as e:
         return Response({"error": str(e)}, status=400)
@@ -219,6 +255,19 @@ def stop_work(request):
     session.end_at = timezone.now()
     session.status = WorkSession.Status.CLOSED
     session.save(update_fields=["end_at", "status", "break_start", "on_break", "total_break_seconds"])
+    
+    # Audit log
+    write_audit(
+        request,
+        action="WORK_STOPPED",
+        entity_type="WorkSession",
+        entity_id=session.id,
+        metadata={
+            "start_at": session.start_at.isoformat() if session.start_at else None,
+            "end_at": session.end_at.isoformat() if session.end_at else None,
+            "total_break_seconds": session.total_break_seconds,
+        },
+    )
     
     return Response({"status": "stopped"})
 
@@ -255,6 +304,18 @@ def session_break_start(request):
     session.break_start = timezone.now()
     session.on_break = True
     session.save(update_fields=["break_start", "on_break"])
+    
+    # Audit log
+    write_audit(
+        request,
+        action="BREAK_STARTED",
+        entity_type="WorkSession",
+        entity_id=session.id,
+        metadata={
+            "break_start": session.break_start.isoformat() if session.break_start else None,
+        },
+    )
+    
     return Response({"message": "Break started"})
 
 
@@ -269,12 +330,27 @@ def session_break_end(request):
     ).first()
     if not session:
         return Response({"error": "No active session"}, status=400)
+    break_duration = 0
     if session.break_start:
         diff = int((timezone.now() - session.break_start).total_seconds())
         session.total_break_seconds += diff
+        break_duration = diff
     session.break_start = None
     session.on_break = False
     session.save(update_fields=["break_start", "on_break", "total_break_seconds"])
+    
+    # Audit log
+    write_audit(
+        request,
+        action="BREAK_ENDED",
+        entity_type="WorkSession",
+        entity_id=session.id,
+        metadata={
+            "break_duration_seconds": break_duration,
+            "total_break_seconds": session.total_break_seconds,
+        },
+    )
+    
     return Response({"message": "Break ended"})
 
 
