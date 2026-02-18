@@ -114,6 +114,8 @@ def update_task_status(request, task_id):
         return Response({"error": "Invalid status"}, status=400)
 
     task.status = new_status
+    if new_status == "DONE":
+        task.completed_at = timezone.now()
     task.save()
 
     return Response({"status": "updated"})
@@ -187,6 +189,42 @@ def break_end(request):
         return Response({"status": "break_ended"})
     except Exception as e:
         return Response({"error": str(e)}, status=400)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def session_break_start(request):
+    session = WorkSession.objects.filter(
+        user=request.user,
+        end_at__isnull=True,
+        status="OPEN",
+    ).first()
+    if not session:
+        return Response({"error": "No active session"}, status=400)
+    session.break_start = timezone.now()
+    session.on_break = True
+    session.save(update_fields=["break_start", "on_break"])
+    return Response({"message": "Break started"})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def session_break_end(request):
+    session = WorkSession.objects.filter(
+        user=request.user,
+        end_at__isnull=True,
+        status="OPEN",
+    ).first()
+    if not session:
+        return Response({"error": "No active session"}, status=400)
+    if session.break_start:
+        break_duration = int((timezone.now() - session.break_start).total_seconds())
+        session.total_break_seconds += break_duration
+    session.break_start = None
+    session.on_break = False
+    session.save(update_fields=["break_start", "on_break", "total_break_seconds"])
+    return Response({"message": "Break ended"})
+
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])

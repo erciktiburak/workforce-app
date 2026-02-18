@@ -66,6 +66,9 @@ class WorkSession(models.Model):
         choices=Status.choices,
         default=Status.OPEN,
     )
+    on_break = models.BooleanField(default=False)
+    break_start = models.DateTimeField(null=True, blank=True)
+    total_break_seconds = models.IntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -126,6 +129,8 @@ class Task(models.Model):
     )
 
     due_date = models.DateField(null=True, blank=True)
+
+    completed_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

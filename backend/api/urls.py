@@ -1,6 +1,6 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .views import CookieTokenObtainPairView, CookieTokenRefreshView, cookie_logout, me_view, ping, online_users
+from .views import CookieTokenObtainPairView, CookieTokenRefreshView, cookie_logout, me_view, ping, online_users, organization_users_detailed
 from accounts.views import create_employee, organization_users, create_invite, accept_invite
 
 urlpatterns = [
@@ -13,6 +13,7 @@ urlpatterns = [
     path("online-users/", online_users),
     # User management
     path("users/", organization_users),
+    path("users/detailed/", organization_users_detailed),
     path("users/create/", create_employee),
     # Invites
     path("invites/create/", create_invite),

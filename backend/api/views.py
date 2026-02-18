@@ -2,6 +2,7 @@ from django.utils import timezone
 from datetime import timedelta
 from api.permissions import IsAdmin
 from accounts.models import User
+from work.models import WorkSession, Task
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -93,15 +94,67 @@ def online_users(request):
     org = request.user.organization
     if not org:
         return Response([])
-    threshold = timezone.now() - timedelta(seconds=60)
-    users = User.objects.filter(
-        organization=org,
-        last_seen_at__gte=threshold,
-    )
-    return Response([
-        {"id": u.id, "username": u.username}
-        for u in users
-    ])
+    now = timezone.now()
+    users = User.objects.filter(organization=org)
+    active_sessions = {
+        s.user_id: s
+        for s in WorkSession.objects.filter(
+            organization=org, end_at__isnull=True, status="OPEN"
+        ).select_related("user")
+    }
+    data = []
+    for u in users:
+        session = active_sessions.get(u.id)
+        if not session:
+            status = "offline"
+        elif session.on_break or session.break_start:
+            status = "break"
+        elif u.last_seen_at and (now - u.last_seen_at).total_seconds() < 120:
+            status = "working"
+        else:
+            status = "idle"
+        data.append({
+            "id": u.id,
+            "username": u.username,
+            "status": status,
+            "last_seen_at": u.last_seen_at.isoformat() if u.last_seen_at else None,
+        })
+    return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def organization_users_detailed(request):
+    if request.user.role != "ADMIN":
+        return Response({"error": "Unauthorized"}, status=403)
+    org = request.user.organization
+    if not org:
+        return Response([])
+    users = User.objects.filter(organization=org)
+    data = []
+    for u in users:
+        session = WorkSession.objects.filter(
+            user=u, end_at__isnull=True, status="OPEN"
+        ).first()
+        status = "offline"
+        start_time = None
+        if session:
+            if session.on_break or session.break_start:
+                status = "break"
+            else:
+                status = "working"
+            start_time = session.start_at.isoformat() if session.start_at else None
+        current_task = Task.objects.filter(
+            assigned_to=u, status__in=["TODO", "DOING"]
+        ).order_by("-created_at").values("id", "title", "status").first()
+        data.append({
+            "id": u.id,
+            "username": u.username,
+            "status": status,
+            "start_time": start_time,
+            "current_task": current_task,
+        })
+    return Response(data)
     
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
