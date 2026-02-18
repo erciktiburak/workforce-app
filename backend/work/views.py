@@ -7,6 +7,7 @@ from .models import WorkPolicy
 from django.utils import timezone
 from datetime import timedelta
 from accounts.models import User
+from accounts.utils import resolve_user_status
 from .models import WorkSession
 from .services import calculate_session_duration
 from django.db.models import Sum, F, ExpressionWrapper, DurationField
@@ -587,5 +588,103 @@ def admin_summary(request):
             "completion_rate": round(
                 (tasks_done / max(1, tasks_total)) * 100, 1
             ),
+        },
+    })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_user_detail(request, user_id):
+    """
+    Admin için kullanıcı detay analytics paneli:
+    - status
+    - today start time / net / break / total
+    - weekly net hours (last 7 days)
+    - active task
+    - task completion rate (assigned tasks)
+    """
+    if request.user.role != "ADMIN":
+        return Response(status=403)
+
+    org = request.user.organization
+    if not org:
+        return Response(status=400)
+
+    try:
+        user = User.objects.get(
+            id=user_id,
+            organization=org,
+        )
+    except User.DoesNotExist:
+        return Response(status=404)
+
+    now = timezone.now()
+    today = now.date()
+
+    sessions = WorkSession.objects.filter(
+        user=user,
+        start_at__date=today,
+    ).order_by("start_at")
+
+    net_sum = 0
+    break_sum = 0
+    total_sum = 0
+    start_time = None
+
+    for s in sessions:
+        if start_time is None:
+            start_time = s.start_at
+        net, brk, ttl = _net_seconds(s, now)
+        net_sum += net
+        break_sum += brk
+        total_sum += ttl
+
+    # active task (DOING)
+    active_task = Task.objects.filter(
+        organization=org,
+        assigned_to=user,
+        status="DOING",
+    ).order_by("-created_at").values("id", "title", "status", "created_at").first()
+
+    # weekly net seconds (last 7 days)
+    start = today - timedelta(days=6)
+    weekly_sessions = WorkSession.objects.filter(
+        user=user,
+        start_at__date__gte=start,
+    )
+
+    day_map = {(start + timedelta(days=i)).isoformat(): 0 for i in range(7)}
+    for s in weekly_sessions:
+        day = s.start_at.date().isoformat()
+        net, _, _ = _net_seconds(s, now)
+        day_map[day] = day_map.get(day, 0) + net
+
+    weekly = [
+        {"date": date_str, "hours": round(seconds / 3600, 2)}
+        for date_str, seconds in sorted(day_map.items())
+    ]
+
+    # task completion rate (assigned tasks only)
+    tasks_qs = Task.objects.filter(organization=org, assigned_to=user)
+    tasks_total = tasks_qs.count()
+    tasks_done = tasks_qs.filter(status="DONE").count()
+    completion_rate = round((tasks_done / max(1, tasks_total)) * 100, 1)
+
+    return Response({
+        "id": user.id,
+        "username": user.username,
+        "status": resolve_user_status(user),
+        "today": {
+            "start_time": start_time.isoformat() if start_time else None,
+            "net_seconds": int(net_sum),
+            "break_seconds": int(break_sum),
+            "total_seconds": int(total_sum),
+        },
+        "weekly": weekly,
+        "active_task": active_task,
+        "tasks": {
+            "total": tasks_total,
+            "done": tasks_done,
+            "completion_rate": completion_rate,
         },
     })
