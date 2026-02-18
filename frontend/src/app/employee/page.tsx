@@ -318,11 +318,26 @@ export default function EmployeeDashboard() {
       <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 transition-colors mt-6">
         <h2 className="text-lg mb-4 font-medium text-gray-800 dark:text-white">Monthly Report</h2>
         <button
-          onClick={() => {
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = now.getMonth() + 1;
-            window.open(`http://127.0.0.1:8000/api/work/reports/me/monthly-pdf/?year=${year}&month=${month}`, "_blank");
+          onClick={async () => {
+            try {
+              const now = new Date();
+              const year = now.getFullYear();
+              const month = now.getMonth() + 1;
+              const res = await api.get(
+                `/work/reports/me/monthly-pdf/?year=${year}&month=${month}`,
+                { responseType: "blob" }
+              );
+              const url = window.URL.createObjectURL(new Blob([res.data]));
+              const link = document.createElement("a");
+              link.href = url;
+              link.setAttribute("download", `monthly_report_${month.toString().padStart(2, "0")}_${year}.pdf`);
+              document.body.appendChild(link);
+              link.click();
+              link.remove();
+              window.URL.revokeObjectURL(url);
+            } catch (err: any) {
+              toast.error(err.response?.data?.detail || "Failed to download PDF");
+            }
           }}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
         >

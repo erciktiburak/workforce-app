@@ -63,6 +63,9 @@ export default function DashboardLayout({
                 <Link href="/admin/employees" className="hover:text-blue-500 dark:hover:text-blue-400 transition">
                   Employees
                 </Link>
+                <Link href="/admin/audit" className="hover:text-blue-500 dark:hover:text-blue-400 transition">
+                  Audit Logs
+                </Link>
                 <Link href="/admin/policy" className="hover:text-blue-500 dark:hover:text-blue-400 transition">
                   Policy
                 </Link>
