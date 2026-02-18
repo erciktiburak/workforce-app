@@ -14,6 +14,27 @@ from django.db.models.functions import TruncDate
 from .models import Task
 from .serializers import TaskSerializer
 
+
+def _net_seconds(session: WorkSession, now):
+    """
+    Bir WorkSession için net çalışma süresini hesaplar.
+
+    Dönüş:
+    - net: (end - start) - break
+    - break: tüm break süresi (devam eden break dahil)
+    - total: (end - start)
+    """
+    end = session.end_at or now
+    total = (end - session.start_at).total_seconds()
+    total_break = session.total_break_seconds or 0
+
+    if session.break_start:
+        total_break += (now - session.break_start).total_seconds()
+
+    net = max(0, total - total_break)
+    return int(net), int(total_break), int(total)
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsAdmin])
 def weekly_stats(request):
@@ -355,13 +376,8 @@ def my_daily_stats(request):
     now = timezone.now()
 
     for s in sessions:
-        if s.end_at:
-            seconds = (s.end_at - s.start_at).total_seconds()
-        else:
-            seconds = (now - s.start_at).total_seconds()
-
-        seconds -= s.total_break_seconds
-        total += max(0, seconds)
+        net, _, _ = _net_seconds(s, now)
+        total += net
 
     return Response({
         "today_seconds": int(total)
@@ -420,11 +436,156 @@ def my_today_timeline(request):
 
     data = []
 
+    now = timezone.now()
+
     for s in sessions:
+        net, brk, ttl = _net_seconds(s, now)
         data.append({
             "start": s.start_at.isoformat() if s.start_at else None,
             "end": s.end_at.isoformat() if s.end_at else None,
-            "break_seconds": s.total_break_seconds,
+            "break_seconds": brk,
+            "total_seconds": ttl,
+            "net_seconds": net,
         })
 
     return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_analytics(request):
+    """
+    Employee için günlük özet analytics:
+    - work (net)
+    - break
+    - total
+    """
+    now = timezone.now()
+    today = now.date()
+
+    sessions = WorkSession.objects.filter(
+        user=request.user,
+        start_at__date=today,
+    )
+
+    net_sum = 0
+    break_sum = 0
+    total_sum = 0
+
+    for s in sessions:
+        net, brk, ttl = _net_seconds(s, now)
+        net_sum += net
+        break_sum += brk
+        total_sum += ttl
+
+    return Response({
+        "today": {
+            "net_seconds": net_sum,
+            "break_seconds": break_sum,
+            "total_seconds": total_sum,
+        }
+    })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_weekly(request):
+    """
+    Employee için son 7 gün net çalışma süreleri.
+    """
+    now = timezone.now()
+    start = now.date() - timedelta(days=6)
+
+    sessions = WorkSession.objects.filter(
+        user=request.user,
+        start_at__date__gte=start,
+    )
+
+    day_map = {(start + timedelta(days=i)).isoformat(): 0 for i in range(7)}
+
+    for s in sessions:
+        day = s.start_at.date().isoformat()
+        net, _, _ = _net_seconds(s, now)
+        day_map[day] = day_map.get(day, 0) + net
+
+    data = [
+        {"date": date_str, "hours": round(seconds / 3600, 2)}
+        for date_str, seconds in sorted(day_map.items())
+    ]
+    return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_summary(request):
+    """
+    Admin için takım haftalık özeti:
+    - top workers
+    - break ratio
+    - task completion rate
+    """
+    if request.user.role != "ADMIN":
+        return Response(status=403)
+
+    org = request.user.organization
+    if not org:
+        return Response({
+            "top_workers": [],
+            "tasks": {"total": 0, "done": 0, "completion_rate": 0.0},
+        })
+
+    now = timezone.now()
+    start = now.date() - timedelta(days=6)
+
+    sessions = (
+        WorkSession.objects
+        .filter(
+            organization=org,
+            start_at__date__gte=start,
+        )
+        .select_related("user")
+    )
+
+    user_map = {}
+
+    for s in sessions:
+        net, brk, ttl = _net_seconds(s, now)
+        uid = s.user_id
+        if uid not in user_map:
+            user_map[uid] = {
+                "id": uid,
+                "username": s.user.username,
+                "net_seconds": 0,
+                "break_seconds": 0,
+                "total_seconds": 0,
+            }
+        user_map[uid]["net_seconds"] += net
+        user_map[uid]["break_seconds"] += brk
+        user_map[uid]["total_seconds"] += ttl
+
+    tasks_qs = Task.objects.filter(organization=org)
+    tasks_total = tasks_qs.count()
+    tasks_done = tasks_qs.filter(status="DONE").count()
+
+    top = sorted(user_map.values(), key=lambda x: x["net_seconds"], reverse=True)[:10]
+
+    return Response({
+        "top_workers": [
+            {
+                "id": u["id"],
+                "username": u["username"],
+                "hours": round(u["net_seconds"] / 3600, 2),
+                "break_ratio": round(
+                    (u["break_seconds"] / max(1, u["total_seconds"])) * 100, 1
+                ),
+            }
+            for u in top
+        ],
+        "tasks": {
+            "total": tasks_total,
+            "done": tasks_done,
+            "completion_rate": round(
+                (tasks_done / max(1, tasks_total)) * 100, 1
+            ),
+        },
+    })
